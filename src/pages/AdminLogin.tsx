@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 export default function AdminLogin() {
@@ -25,19 +25,28 @@ export default function AdminLogin() {
         signal: controller.signal
       });
       clearTimeout(timeoutId);
+      console.log("Login response status:", res.status);
       const data = await res.json();
+      console.log("Login res data:", data);
+      
       if (res.ok) {
-        if (data.user.phone !== "admin") {
+        if (!data.user || data.user.phone !== "admin") {
+          console.warn("Attempt to log into admin with non-admin user:", data.user);
           setError("非管理员账号");
           return;
         }
+        console.log("Admin login success, saving to localStorage and redirecting...");
         localStorage.setItem("adminUser", JSON.stringify(data.user));
-        window.location.href = "/admin";
+        // Use a small delay before redirect to ensure localStorage is settled
+        setTimeout(() => {
+          window.location.href = "/admin";
+        }, 100);
       } else {
         setError(data.error || "账号或密码错误");
       }
     } catch (e) {
-      setError("登录失败，请检查网络连接");
+      console.error("Admin login fetch error:", e);
+      setError("登录失败，请检查网络连接或稍后再试");
     } finally {
       setLoading(false);
     }

@@ -7,6 +7,7 @@ export interface ITurnoverItem extends Document {
   userName: string;
   description?: string;
   views: number;
+  favoritesCount?: number;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: Date;
   wx?: string;
@@ -28,4 +29,5 @@ const TurnoverItemSchema = new Schema({
   phone: { type: String },
 });
 
-export default mongoose.models.TurnoverItem || mongoose.model<ITurnoverItem>('TurnoverItem', TurnoverItemSchema);
+const Model = mongoose.models.TurnoverItem || mongoose.model<ITurnoverItem>('TurnoverItem', TurnoverItemSchema);
+export default Model;

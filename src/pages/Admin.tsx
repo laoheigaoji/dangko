@@ -16,6 +16,26 @@ export default function Admin() {
   const [searchQuery, setSearchQuery] = useState("");
 
   const [smtp, setSmtp] = useState({ host: '', port: '', user: '', pass: '', from: '' });
+  const [notice, setNotice] = useState({ enabled: true, title: '', content: '', date: '' });
+
+  const fetchNotice = async () => {
+    const res = await fetch('/api/settings/notice');
+    const data = await res.json();
+    if (data) setNotice(data);
+  };
+
+  const saveNotice = async () => {
+    try {
+      await fetch('/api/settings/notice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(notice)
+      });
+      alert('公告设置已保存');
+    } catch (e) {
+      alert('保存失败');
+    }
+  };
 
   const [showAdminPasswordModal, setShowAdminPasswordModal] = useState(false);
   const [adminNewPassword, setAdminNewPassword] = useState("");
@@ -59,14 +79,31 @@ export default function Admin() {
     }
   };
 
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    const adminUser = localStorage.getItem("adminUser");
-    if (!adminUser) {
+    console.log("Admin component checking auth...");
+    const adminUserStr = localStorage.getItem("adminUser");
+    if (!adminUserStr) {
+      console.log("No adminUser in localStorage, redirecting to login");
       window.location.href = '/admin/login';
       return;
     }
-    fetchData();
-    fetchSmtp();
+    try {
+      const adminUser = JSON.parse(adminUserStr);
+      if (adminUser.phone !== 'admin') {
+        throw new Error("Not an admin account");
+      }
+      console.log("Admin auth verified:", adminUser.phone);
+      setLoading(false);
+      fetchData();
+      fetchSmtp();
+      fetchNotice();
+    } catch (e) {
+      console.error("Auth verify failed:", e);
+      localStorage.removeItem("adminUser");
+      window.location.href = '/admin/login';
+    }
   }, []);
 
   const fetchData = async () => {
@@ -76,9 +113,12 @@ export default function Admin() {
         fetch('/api/admin/turnover'),
         fetch('/api/admin/buy')
       ]);
-      setUsers(await uRes.json());
-      setTurnoverItems(await tRes.json());
-      setBuyItems(await bRes.json());
+      const usersData = await uRes.json();
+      const tData = await tRes.json();
+      const bData = await bRes.json();
+      setUsers(Array.isArray(usersData) ? usersData : []);
+      setTurnoverItems(Array.isArray(tData) ? tData : []);
+      setBuyItems(Array.isArray(bData) ? bData : []);
     } catch (e) {
       console.error(e);
     }
@@ -161,6 +201,15 @@ export default function Admin() {
     localStorage.removeItem("adminUser");
     window.location.href = '/admin/login';
   };
+
+  if (loading) return (
+    <div className="min-h-screen bg-[#f5f6f8] flex items-center justify-center">
+      <div className="flex flex-col items-center gap-2">
+        <div className="w-8 h-8 border-4 border-gray-800 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-sm text-gray-500">正在进入管理系统...</p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-[#f5f6f8] pb-20">
@@ -496,64 +545,121 @@ export default function Admin() {
         )}
 
         {activeTab === 'settings' && (
-          <div className="bg-white p-6 rounded-lg shadow-sm space-y-4">
-            <h2 className="text-lg font-bold text-gray-800 border-b pb-2">SMTP 邮件配置</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">SMTP Host</label>
-                <input 
-                  type="text" 
-                  value={smtp.host} 
-                  onChange={e => setSmtp({...smtp, host: e.target.value})}
-                  className="w-full border rounded px-3 py-2 text-sm outline-none focus:border-gray-800"
-                  placeholder="smtp.example.com"
-                />
+          <div className="space-y-6">
+            <div className="bg-white p-6 rounded-lg shadow-sm space-y-4">
+              <h2 className="text-lg font-bold text-gray-800 border-b pb-2 flex items-center gap-2">
+                <Info size={18} className="text-blue-500" />
+                公告设置 (首页弹窗)
+              </h2>
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <span className="text-sm font-medium text-gray-700">启用首页公告</span>
+                <button 
+                  onClick={() => setNotice({...notice, enabled: !notice.enabled})}
+                  className={`w-12 h-6 rounded-full transition-colors relative ${notice.enabled ? 'bg-green-500' : 'bg-gray-300'}`}
+                >
+                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${notice.enabled ? 'left-7' : 'left-1'}`}></div>
+                </button>
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">SMTP Port</label>
+                <label className="block text-xs text-gray-500 mb-1">公告标题</label>
                 <input 
                   type="text" 
-                  value={smtp.port} 
-                  onChange={e => setSmtp({...smtp, port: e.target.value})}
+                  value={notice.title} 
+                  onChange={e => setNotice({...notice, title: e.target.value})}
                   className="w-full border rounded px-3 py-2 text-sm outline-none focus:border-gray-800"
-                  placeholder="465"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">SMTP User</label>
-                <input 
-                  type="text" 
-                  value={smtp.user} 
-                  onChange={e => setSmtp({...smtp, user: e.target.value})}
-                  className="w-full border rounded px-3 py-2 text-sm outline-none focus:border-gray-800"
+                  placeholder="请输入公告标题"
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">SMTP Pass</label>
-                <input 
-                  type="password" 
-                  value={smtp.pass} 
-                  onChange={e => setSmtp({...smtp, pass: e.target.value})}
-                  className="w-full border rounded px-3 py-2 text-sm outline-none focus:border-gray-800"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs text-gray-500 mb-1">Sender Email (From)</label>
+                <label className="block text-xs text-gray-500 mb-1">公告日期 (显示于标题下方)</label>
                 <input 
                   type="text" 
-                  value={smtp.from} 
-                  onChange={e => setSmtp({...smtp, from: e.target.value})}
+                  value={notice.date} 
+                  onChange={e => setNotice({...notice, date: e.target.value})}
                   className="w-full border rounded px-3 py-2 text-sm outline-none focus:border-gray-800"
-                  placeholder="platform@example.com"
+                  placeholder="2026-05-05"
                 />
               </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">公告内容</label>
+                <textarea 
+                  rows={3}
+                  value={notice.content} 
+                  onChange={e => setNotice({...notice, content: e.target.value})}
+                  className="w-full border rounded px-3 py-2 text-sm outline-none focus:border-gray-800"
+                  placeholder="请输入公告详细内容"
+                />
+              </div>
+              <button 
+                onClick={saveNotice}
+                className="w-full bg-blue-500 text-white font-bold py-3 rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                保存公告配置
+              </button>
             </div>
-            <button 
-              onClick={saveSmtp}
-              className="w-full bg-gray-800 text-white font-bold py-3 rounded-lg hover:bg-black transition-colors"
-            >
-              保存配置
-            </button>
+
+            <div className="bg-white p-6 rounded-lg shadow-sm space-y-4">
+              <h2 className="text-lg font-bold text-gray-800 border-b pb-2 flex items-center gap-2">
+                <Shield size={18} className="text-gray-600" />
+                SMTP 邮件配置
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">SMTP Host</label>
+                  <input 
+                    type="text" 
+                    value={smtp.host} 
+                    onChange={e => setSmtp({...smtp, host: e.target.value})}
+                    className="w-full border rounded px-3 py-2 text-sm outline-none focus:border-gray-800"
+                    placeholder="smtp.example.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">SMTP Port</label>
+                  <input 
+                    type="text" 
+                    value={smtp.port} 
+                    onChange={e => setSmtp({...smtp, port: e.target.value})}
+                    className="w-full border rounded px-3 py-2 text-sm outline-none focus:border-gray-800"
+                    placeholder="465"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">SMTP User</label>
+                  <input 
+                    type="text" 
+                    value={smtp.user} 
+                    onChange={e => setSmtp({...smtp, user: e.target.value})}
+                    className="w-full border rounded px-3 py-2 text-sm outline-none focus:border-gray-800"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">SMTP Pass</label>
+                  <input 
+                    type="password" 
+                    value={smtp.pass} 
+                    onChange={e => setSmtp({...smtp, pass: e.target.value})}
+                    className="w-full border rounded px-3 py-2 text-sm outline-none focus:border-gray-800"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs text-gray-500 mb-1">Sender Email (From)</label>
+                  <input 
+                    type="text" 
+                    value={smtp.from} 
+                    onChange={e => setSmtp({...smtp, from: e.target.value})}
+                    className="w-full border rounded px-3 py-2 text-sm outline-none focus:border-gray-800"
+                    placeholder="platform@example.com"
+                  />
+                </div>
+              </div>
+              <button 
+                onClick={saveSmtp}
+                className="w-full bg-gray-800 text-white font-bold py-3 rounded-lg hover:bg-black transition-colors"
+              >
+                保存邮件配置
+              </button>
+            </div>
           </div>
         )}
       </div>

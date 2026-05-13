@@ -23,6 +23,7 @@ import ProfileSubscriptions from "./pages/ProfileSubscriptions";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ROI from "./pages/ROI";
+import Unauthorized from "./pages/Unauthorized";
 
 export default function App() {
   return (
@@ -44,6 +45,7 @@ export default function App() {
           <Route path="/profile/publish-buy" element={<PublishBuy />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/unauthorized" element={<Unauthorized />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin" element={<Admin />} />
         </Routes>

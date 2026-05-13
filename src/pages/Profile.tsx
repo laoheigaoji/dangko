@@ -10,13 +10,13 @@ export default function Profile() {
     if (userStr) {
       setUser(JSON.parse(userStr));
     } else {
-      navigate('/login');
+      navigate('/unauthorized');
     }
   }, [navigate]);
 
   const handleLogout = () => {
     localStorage.removeItem("user");
-    navigate('/login');
+    setUser(null);
   };
 
   const menuItems = [
@@ -34,7 +34,7 @@ export default function Profile() {
       <div className="bg-gradient-to-br from-[#5978f5] to-[#8b55b7] pt-[40px] pb-[20px] px-4 text-white text-center rounded-b-[20px] shadow-sm relative overflow-hidden">
         <h1 className="text-[28px] font-black mb-2 tracking-wider" style={{textShadow: "0 2px 4px rgba(0,0,0,0.15)"}}>用户</h1>
         <p className="text-[14px] opacity-90 tracking-wide font-light">{user.phone}</p>
-        <p className="text-[12px] opacity-80 mt-1">{user.isVip ? '💎 VIP会员' : '普通用户'}</p>
+        <p className="text-[12px] opacity-80 mt-1">{user.isVip ? '已开通发布权限' : '未开通发布权限'}</p>
       </div>
       
       <div className="px-3 mt-4">

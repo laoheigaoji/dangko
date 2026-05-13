@@ -24,6 +24,9 @@ export default function TurnoverDetail() {
         });
     }
 
+    // Increment view
+    fetch(`/api/turnover/${id}/view`, { method: "PATCH" });
+
     fetch(`/api/turnover/${id}`)
       .then((res) => res.json())
       .then((data) => setItem(data))
@@ -42,6 +45,11 @@ export default function TurnoverDetail() {
       });
       if (res.ok) {
         setIsFavorited(!isFavorited);
+        // Update local item state to reflect favorite change if needed, 
+        // but it's better to just refresh the item data for accuracy
+        fetch(`/api/turnover/${id}`)
+          .then((res) => res.json())
+          .then((data) => setItem(data));
       }
     } catch (e) {
       console.error(e);
@@ -113,7 +121,7 @@ export default function TurnoverDetail() {
             </span>
             <div className="flex gap-4">
               <span className="flex items-center gap-1.5"><Eye size={14} className="text-[#8c5b43]"/> {item.views || 0}</span>
-              <span className="flex items-center gap-1.5"><Heart size={14} className="text-[#f56c6c] fill-current"/> 0</span>
+              <span className="flex items-center gap-1.5"><Heart size={14} className={`size-[14px] ${isFavorited ? 'text-[#f56c6c] fill-current' : 'text-gray-300'}`}/> {item.favoritesCount || 0}</span>
             </div>
           </div>
         </div>

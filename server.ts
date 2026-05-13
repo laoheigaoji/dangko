@@ -3,10 +3,16 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import TurnoverItem from "./src/models/TurnoverItem.ts";
-import BuyItem from "./src/models/BuyItem.ts";
-import User from "./src/models/User.ts";
-import Settings from "./src/models/Settings.ts";
+import _TurnoverItem from "./src/models/TurnoverItem";
+import _BuyItem from "./src/models/BuyItem";
+import _User from "./src/models/User";
+import _Settings from "./src/models/Settings";
+
+const TurnoverItem = _TurnoverItem as any;
+const BuyItem = _BuyItem as any;
+const User = _User as any;
+const Settings = _Settings as any;
+
 import nodemailer from "nodemailer";
 
 dotenv.config();
@@ -137,11 +143,27 @@ async function startServer() {
   }
 
   app.get("/api/turnover", async (req, res) => {
-    const items = await TurnoverItem.find({ status: 'approved' }).sort({ createdAt: -1 });
+    const { search } = req.query;
+    const filter: any = { status: 'approved' };
+    
+    if (search) {
+      filter.$or = [
+        { shopName: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    const items = await TurnoverItem.find(filter).sort({ createdAt: -1 });
     res.json(items);
   });
   app.get("/api/turnover/:id", async (req, res) => {
     const item = await TurnoverItem.findById(req.params.id);
+    if (!item) return res.status(404).json({ error: "Item not found" });
+    const favoritesCount = await User.countDocuments({ favorites: req.params.id });
+    res.json({ ...item.toObject(), favoritesCount });
+  });
+  app.patch("/api/turnover/:id/view", async (req, res) => {
+    const item = await TurnoverItem.findByIdAndUpdate(req.params.id, { $inc: { views: 1 } }, { new: true });
     res.json(item);
   });
   app.post("/api/turnover", async (req, res) => {
@@ -155,11 +177,27 @@ async function startServer() {
   });
 
   app.get("/api/buy", async (req, res) => {
-    const items = await BuyItem.find({ status: 'approved' }).sort({ createdAt: -1 });
+    const { search } = req.query;
+    const filter: any = { status: 'approved' };
+    
+    if (search) {
+      filter.$or = [
+        { shopName: { $regex: search, $options: 'i' } },
+        { remark: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    const items = await BuyItem.find(filter).sort({ createdAt: -1 });
     res.json(items);
   });
   app.get("/api/buy/:id", async (req, res) => {
     const item = await BuyItem.findById(req.params.id);
+    if (!item) return res.status(404).json({ error: "Item not found" });
+    const favoritesCount = await User.countDocuments({ favorites: req.params.id });
+    res.json({ ...item.toObject(), favoritesCount });
+  });
+  app.patch("/api/buy/:id/view", async (req, res) => {
+    const item = await BuyItem.findByIdAndUpdate(req.params.id, { $inc: { views: 1 } }, { new: true });
     res.json(item);
   });
   app.post("/api/buy", async (req, res) => {
@@ -255,6 +293,16 @@ async function startServer() {
     res.json(user);
   });
 
+  app.get("/api/users/:phone/turnover", async (req, res) => {
+    const items = await TurnoverItem.find({ phone: req.params.phone }).sort({ createdAt: -1 });
+    res.json(items);
+  });
+
+  app.get("/api/users/:phone/buy", async (req, res) => {
+    const items = await BuyItem.find({ phone: req.params.phone }).sort({ createdAt: -1 });
+    res.json(items);
+  });
+
   app.post("/api/users/:id/favorites", async (req, res) => {
     const { itemId } = req.body;
     const user = await User.findById(req.params.id);
@@ -329,12 +377,27 @@ async function startServer() {
   });
 
   // Settings
+  app.get("/api/settings/notice", async (req, res) => {
+    const notice = await Settings.findOne({ key: "notice" });
+    res.json(notice ? notice.value : null);
+  });
+
+  app.post("/api/settings/notice", async (req, res) => {
+    const { enabled, title, content, date } = req.body;
+    await Settings.findOneAndUpdate(
+      { key: "notice" },
+      { value: { enabled, title, content, date } },
+      { upsert: true }
+    );
+    res.json({ success: true });
+  });
+
   app.get("/api/settings/smtp", async (req, res) => {
     const smtp = await Settings.findOne({ key: "smtp" });
     res.json(smtp ? smtp.value : null);
   });
 
-  // Initialize Default SMTP if not exists
+  // Initialize Default Settings if not exists
   async function initSettings() {
     const existing = await Settings.findOne({ key: "smtp" });
     if (!existing) {
@@ -352,6 +415,23 @@ async function startServer() {
         { upsert: true }
       );
       console.log("Default SMTP configured");
+    }
+
+    const noticeExisting = await Settings.findOne({ key: "notice" });
+    if (!noticeExisting) {
+      await Settings.findOneAndUpdate(
+        { key: "notice" },
+        { 
+          value: { 
+            enabled: true,
+            title: "新增订阅档口功能",
+            content: "登录后在个人中心添加订阅档口，有该档口信息发布时将自动邮件通知您。",
+            date: "2026-05-05"
+          } 
+        },
+        { upsert: true }
+      );
+      console.log("Default Notice configured");
     }
   }
   initSettings();

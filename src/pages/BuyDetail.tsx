@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { IBuyItem } from "../models/BuyItem";
-import { ChevronLeft, Share2, User, CalendarDays, Edit3, MessageCircle, Phone, Heart } from "lucide-react";
+import { ChevronLeft, Share2, User, CalendarDays, Edit3, MessageCircle, Phone, Heart, Eye } from "lucide-react";
 
 export default function BuyDetail() {
   const { id } = useParams();
@@ -24,6 +24,9 @@ export default function BuyDetail() {
         });
     }
 
+    // Increment view
+    fetch(`/api/buy/${id}/view`, { method: "PATCH" });
+
     fetch(`/api/buy/${id}`)
       .then((res) => res.json())
       .then((data) => setItem(data))
@@ -42,6 +45,10 @@ export default function BuyDetail() {
       });
       if (res.ok) {
         setIsFavorited(!isFavorited);
+        // Refresh item data to get updated favoritesCount
+        fetch(`/api/buy/${id}`)
+          .then((res) => res.json())
+          .then((data) => setItem(data));
       }
     } catch (e) {
       console.error(e);
@@ -97,6 +104,10 @@ export default function BuyDetail() {
             <span className="flex items-center gap-1.5">
               <CalendarDays size={14} className="text-[#84a9e6]"/> {formatDate(item.createdAt)}
             </span>
+            <div className="flex gap-4">
+              <span className="flex items-center gap-1.5"><Eye size={14} className="text-[#8c5b43]"/> {item.views || 0}</span>
+              <span className="flex items-center gap-1.5"><Heart size={14} className={`size-[14px] ${isFavorited ? 'text-[#f56c6c] fill-current' : 'text-gray-300'}`}/> {item.favoritesCount || 0}</span>
+            </div>
           </div>
 
           <div className="border-t border-dashed border-[#d2f0d4] pt-2">

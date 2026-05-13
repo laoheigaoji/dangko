@@ -5,6 +5,8 @@ export interface IBuyItem extends Document {
   requestAmount: number;
   userName: string;
   remark?: string;
+  views: number;
+  favoritesCount?: number;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: Date;
   wx?: string;
@@ -17,6 +19,7 @@ const BuyItemSchema = new Schema({
   requestAmount: { type: Number, required: true },
   userName: { type: String, required: true },
   remark: { type: String },
+  views: { type: Number, default: 0 },
   status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
   createdAt: { type: Date, default: Date.now },
   wx: { type: String },
@@ -24,4 +27,5 @@ const BuyItemSchema = new Schema({
   phone: { type: String },
 });
 
-export default mongoose.models.BuyItem || mongoose.model<IBuyItem>('BuyItem', BuyItemSchema);
+const Model = mongoose.models.BuyItem || mongoose.model<IBuyItem>('BuyItem', BuyItemSchema);
+export default Model;

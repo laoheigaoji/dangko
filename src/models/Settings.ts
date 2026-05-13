@@ -5,4 +5,5 @@ const settingsSchema = new mongoose.Schema({
   value: { type: mongoose.Schema.Types.Mixed, required: true },
 });
 
-export default mongoose.models.Settings || mongoose.model("Settings", settingsSchema);
+const Model = mongoose.models.Settings || mongoose.model("Settings", settingsSchema);
+export default Model;
