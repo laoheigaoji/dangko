@@ -14,6 +14,9 @@ export default function Turnover() {
   const [showPublishWarning, setShowPublishWarning] = useState(false);
   const [notice, setNotice] = useState<any>(null);
   const [showNotice, setShowNotice] = useState(false);
+  const [vipPlans, setVipPlans] = useState<any[]>([]);
+  const [loadingPay, setLoadingPay] = useState(false);
+  const [mockOrder, setMockOrder] = useState<any>(null);
   
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [pullProgress, setPullProgress] = useState(0);
@@ -55,6 +58,21 @@ export default function Turnover() {
 
   useEffect(() => {
     fetchData();
+    // Fetch VIP plans
+    fetch('/api/settings/vip-plans')
+      .then(res => res.json())
+      .then(data => {
+        if (data && Array.isArray(data)) {
+          setVipPlans(data);
+        } else {
+          setVipPlans([
+            { id: 'month', name: '月度会员', price: '19.9', label: '尝鲜首选', popular: false },
+            { id: 'quarter', name: '季度会员', price: '39.9', label: '超值推荐', popular: true },
+            { id: 'year', name: '年度会员', price: '88', label: '长期经营', popular: false },
+            { id: 'forever', name: '永久会员', price: '188', label: '终身买断', popular: false },
+          ]);
+        }
+      });
   }, []);
 
   const handleSearch = () => {
@@ -115,6 +133,59 @@ export default function Turnover() {
       setShowPublishWarning(true);
     } else {
       navigate('/profile/publish-turnover');
+    }
+  };
+
+  const handlePay = async (plan: any) => {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) return;
+    const user = JSON.parse(userStr);
+
+    setLoadingPay(true);
+    try {
+      const res = await fetch('/api/payment/alipay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, planId: plan.id, type: 'publish' })
+      });
+      const data = await res.json();
+      
+      if (data.url) {
+        window.location.href = data.url;
+      } else if (data.mock) {
+        setMockOrder({ ...data, plan });
+      } else {
+        alert(data.error || '支付发起失败');
+      }
+    } catch (e) {
+      alert('网络错误');
+    } finally {
+      setLoadingPay(false);
+    }
+  };
+
+  const confirmMockPay = async () => {
+    if (!mockOrder) return;
+    setLoadingPay(true);
+    try {
+      const res = await fetch('/api/payment/mock-confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ outTradeNo: mockOrder.outTradeNo })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('购买成功！已为您开通发布权限');
+        setShowPublishWarning(false);
+        setMockOrder(null);
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        localStorage.setItem('user', JSON.stringify({ ...user, hasPublish: true, isVip: true }));
+        navigate('/profile/publish-turnover');
+      }
+    } catch (e) {
+      alert('确认支付失败');
+    } finally {
+      setLoadingPay(false);
     }
   };
 
@@ -247,25 +318,74 @@ export default function Turnover() {
       </button>
 
       {showPublishWarning && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[100] pb-10 px-4">
-          <div className="bg-white w-[300px] rounded-[24px] p-6 text-center flex flex-col items-center shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            <svg width="54" height="54" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mb-2">
-              <path d="M11.134 3.447c.4-.7 1.332-.7 1.732 0l8.28 14.34c.4-.7-.098 1.583-.902 1.583H3.756c-.804 0-1.302-.883-.902-1.583l8.28-14.34z" fill="#fbbd23"/>
-              <path d="M12 8v5" stroke="#333" strokeLinecap="round" strokeWidth="2.5"/>
-              <circle cx="12" cy="16.5" r="1.5" fill="#333"/>
-            </svg>
-            <div className="text-[17px] font-bold text-[#333] mb-2 tracking-wide">无法发布</div>
-            <div className="text-[14px] text-[#666] mb-6 leading-relaxed">
-              您当前没有发布权限，<br/>
-              请联系管理员<span className="text-[#4b8cd9] font-medium">开通会员权限</span>
+        <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-[100] p-0 sm:p-4 backdrop-blur-sm">
+          <div className="bg-white w-full sm:max-w-md rounded-t-[32px] sm:rounded-[32px] overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-300">
+            <div className="bg-gradient-to-r from-[#4b8cd9] to-[#67c34b] p-6 text-white text-center">
+              <h3 className="text-xl font-black">开通发布权限</h3>
+              <p className="text-xs opacity-80 mt-1">解锁发布权限，快速转让/求购</p>
             </div>
-            <button 
-              onClick={() => setShowPublishWarning(false)}
-              className="w-full py-3 rounded-[12px] bg-gradient-to-r from-[#4b8cd9] to-[#67c34b] text-white font-bold text-[15px] shadow-[0_4px_12px_rgba(75,140,217,0.3)] active:scale-[0.98] transition-transform"
-            >
-              我知道了
-            </button>
+            
+            <div className="p-6 max-h-[70vh] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-3 mb-6">
+                {vipPlans.map((plan) => (
+                  <div 
+                    key={plan.id}
+                    onClick={() => handlePay(plan)}
+                    className={`p-4 rounded-2xl border-2 cursor-pointer transition-all active:scale-95 text-center relative ${plan.popular ? 'border-[#4b8cd9] bg-blue-50' : 'border-gray-100'}`}
+                  >
+                    {plan.popular && <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-[#4b8cd9] text-white text-[10px] px-2 py-0.5 rounded-full font-bold">推荐</span>}
+                    <div className="text-sm font-bold text-gray-800">{plan.name}</div>
+                    <div className="text-lg font-black text-[#4b8cd9] mt-1">¥{plan.price}</div>
+                    <div className="text-[10px] text-gray-400 mt-1">{plan.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              <button 
+                onClick={() => setShowPublishWarning(false)}
+                className="w-full py-3 text-gray-400 text-sm font-medium"
+              >
+                取消
+              </button>
+            </div>
           </div>
+        </div>
+      )}
+
+      {mockOrder && (
+        <div className="fixed inset-0 z-[110] bg-black/60 flex items-center justify-center p-6 backdrop-blur-sm">
+            <div className="bg-white w-full max-w-sm rounded-[32px] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+                <div className="bg-[#4b8cd9] p-8 text-white text-center">
+                    <h3 className="text-xl font-bold">支付确认</h3>
+                    <p className="text-sm opacity-80 mt-1">请核对订单信息并完成支付</p>
+                </div>
+                <div className="p-8 space-y-6">
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-gray-400">产品名称</span>
+                            <span className="font-bold text-gray-800">发布权限-{mockOrder.plan.name}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-sm">
+                            <span className="text-gray-400">订单编号</span>
+                            <span className="text-gray-600 font-mono text-xs">{mockOrder.outTradeNo}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-gray-400 text-sm">支付金额</span>
+                            <span className="text-2xl font-black text-[#4b8cd9]">¥{mockOrder.plan.price}</span>
+                        </div>
+                    </div>
+
+                    <div className="pt-2">
+                        <button 
+                            onClick={confirmMockPay}
+                            disabled={loadingPay}
+                            className="w-full py-4 bg-[#4b8cd9] text-white font-black rounded-2xl shadow-lg active:scale-95 transition-all disabled:opacity-50"
+                        >
+                            {loadingPay ? '处理中...' : '模拟支付宝支付'}
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
       )}
 

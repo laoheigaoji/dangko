@@ -561,9 +561,9 @@ async function startServer() {
           total_amount: plan.price,
           subject: subject,
         },
-        returnUrl: `${req.protocol}://${req.get('host')}/payment/success`,
-        notifyUrl: `${req.protocol}://${req.get('host')}/api/payment/alipay/notify`,
-      });
+        return_url: `${req.protocol}://${req.get('host')}/payment/success`,
+        notify_url: `${req.protocol}://${req.get('host')}/api/payment/alipay/notify`,
+      }, { method: 'GET' });
 
       res.json({ url: result });
     } catch (e: any) {
@@ -582,10 +582,10 @@ async function startServer() {
     await order.save();
 
     const update: any = {};
-    if (order.type === 'roi') update.hasRoi = true;
-    else if (order.type === 'publish') {
+    if (order.type === 'roi') {
+      update.hasRoi = true;
+    } else if (order.type === 'publish') {
       update.hasPublish = true;
-      update.isVip = true;
     } else {
       update.isVip = true;
       update.hasRoi = true;
@@ -613,10 +613,10 @@ async function startServer() {
             await order.save();
 
             const update: any = {};
-            if (order.type === 'roi') update.hasRoi = true;
-            else if (order.type === 'publish') {
+            if (order.type === 'roi') {
+              update.hasRoi = true;
+            } else if (order.type === 'publish') {
               update.hasPublish = true;
-              update.isVip = true;
             } else {
               update.isVip = true;
               update.hasRoi = true;
