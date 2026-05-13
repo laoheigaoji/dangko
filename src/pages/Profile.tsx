@@ -36,10 +36,10 @@ export default function Profile() {
         <p className="text-[14px] opacity-90 tracking-wide font-light">{user.phone}</p>
         <div className="flex flex-col gap-1 mt-2">
             <p className="text-[11px] opacity-90">
-                {user.hasPublish || user.isVip ? '✅ 已开通发布权限' : '❌ 未开通发布权限'}
+                {user.hasPublish ? '✅ 已开通发布权限' : '❌ 未开通发布权限'}
             </p>
             <p className="text-[11px] opacity-90">
-                {user.hasRoi || user.isVip ? '✅ 已开通ROI工具箱' : '❌ 未开通ROI工具箱'}
+                {user.hasRoi ? '✅ 已开通ROI工具箱' : '❌ 未开通ROI工具箱'}
             </p>
         </div>
       </div>

@@ -58,14 +58,14 @@ export default function ROI() {
       fetch(`/api/users/${user.id}`)
         .then(res => res.json())
         .then(data => {
-          if (data && (data.hasRoi || data.isVip)) {
+          if (data && data.hasRoi) {
             setHasRoi(true);
-            const newUser = { ...user, hasRoi: data.hasRoi, isVip: data.isVip };
+            const newUser = { ...user, hasRoi: true };
             localStorage.setItem('user', JSON.stringify(newUser));
           }
         })
         .catch(() => {
-           if (user.hasRoi || user.isVip) setHasRoi(true);
+           if (user.hasRoi) setHasRoi(true);
         });
     }
 
@@ -106,7 +106,24 @@ export default function ROI() {
       const data = await res.json();
       
       if (data.url) {
-        window.location.href = data.url;
+        // 支付宝可能返回 HTML 表单或纯连接
+        if (data.url.includes('<form')) {
+          const div = document.createElement('div');
+          div.innerHTML = data.url;
+          document.body.appendChild(div);
+          const form = div.querySelector('form');
+          if (form) {
+            form.submit();
+          } else {
+            // 如果没找到 form，尝试解析 action
+            const actionMatch = data.url.match(/action="([^"]+)"/);
+            if (actionMatch && actionMatch[1]) {
+                window.location.href = actionMatch[1];
+            }
+          }
+        } else {
+          window.location.href = data.url;
+        }
       } else if (data.mock) {
         setMockOrder({ ...data, plan });
       } else {

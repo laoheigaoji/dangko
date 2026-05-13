@@ -232,7 +232,7 @@ async function startServer() {
 
       const user = new User({ phone, password, email });
       await user.save();
-      res.status(201).json({ user: { id: user._id, phone: user.phone, isVip: user.isVip, email: user.email } });
+      res.status(201).json({ user: { id: user._id, phone: user.phone, isVip: user.isVip, hasRoi: user.hasRoi, hasPublish: user.hasPublish, email: user.email } });
     } catch (e) {
       res.status(500).json({ error: "注册失败，请稍后再试" });
     }
@@ -252,7 +252,13 @@ async function startServer() {
         return res.status(401).json({ error: "密码错误，请重新输入" });
       }
       console.log("Login successful:", phone);
-      res.json({ user: { id: user._id, phone: user.phone, isVip: user.isVip } });
+      res.json({ user: { 
+        id: user._id, 
+        phone: user.phone, 
+        isVip: user.isVip,
+        hasRoi: user.hasRoi,
+        hasPublish: user.hasPublish
+      } });
     } catch (e) {
       console.error("Login error:", e);
       res.status(500).json({ error: "登录失败，请稍后再试" });
