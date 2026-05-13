@@ -1,0 +1,159 @@
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { ChevronLeft } from "lucide-react";
+
+export default function PublishBuy() {
+  const navigate = useNavigate();
+  const [items, setItems] = useState([{ id: 1, shopName: "", requestAmount: "", remark: "" }]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const addItem = () => setItems([...items, { id: Date.now(), shopName: "", requestAmount: "", remark: "" }]);
+  const removeItem = (id: number) => setItems(items.filter(i => i.id !== id));
+
+  const updateItem = (id: number, field: string, value: string) => {
+    setItems(items.map(item => item.id === id ? { ...item, [field]: value } : item));
+  };
+
+  const handleSubmit = async () => {
+    const userStr = localStorage.getItem("user");
+    if (!userStr) {
+      alert("请先登录");
+      navigate("/login");
+      return;
+    }
+
+    const userInfo = JSON.parse(userStr);
+    
+    // Validate
+    for (const item of items) {
+      if (!item.shopName.trim() || !item.requestAmount) {
+        alert("请填写完整的求购信息（档口名称、金额）");
+        return;
+      }
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Fetch full user profile to get contact info
+      const userRes = await fetch(`/api/users/${userInfo.id}`);
+      const userProfile = await userRes.json();
+
+      const promises = items.map(item => 
+        fetch("/api/buy", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            shopName: item.shopName,
+            requestAmount: Number(item.requestAmount),
+            remark: item.remark,
+            userName: userProfile.phone || "匿名用户",
+            phone: userProfile.phone,
+            wx: userProfile.wx,
+            qq: userProfile.qq
+          })
+        })
+      );
+
+      const results = await Promise.all(promises);
+      const allOk = results.every(res => res.ok);
+
+      if (allOk) {
+        alert("求购信息发布成功！");
+        navigate("/buy");
+      } else {
+        alert("部分信息发布失败，请重试");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("网络连接失败，请稍后再试");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#f5f6f8] font-sans pb-20">
+      <div className="bg-gradient-to-r from-[#69c73a] to-[#8ce857] px-4 pt-8 pb-4 rounded-b-[20px] text-white shadow-sm relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full -mr-10 -mt-10 blur-2xl"></div>
+        <div className="flex items-center relative z-10 mb-2">
+          <button onClick={() => navigate(-1)} className="mr-2"><ChevronLeft size={24} /></button>
+          <h1 className="font-bold text-[18px]">发布求购</h1>
+        </div>
+        <div className="text-[13px] opacity-90 relative z-10 px-1">
+          批量发布求购信息，一次可发布多条
+        </div>
+      </div>
+
+      <div className="px-3 mt-3">
+        <div className="bg-white p-3 rounded-[12px] shadow-[0_2px_8px_rgba(105,199,58,0.06)] border border-[#eef0f5] mb-3">
+          <div className="flex items-center text-[15px] text-[#333] mb-3 font-bold">
+            <span className="mr-1.5 text-[16px]">📋</span> 求购信息列表 
+            <span className="text-[#a0a0a0] font-normal text-[13px] ml-2">共 {items.length} 条</span>
+          </div>
+          
+          {items.map((item, index) => (
+            <div key={item.id} className="bg-white border border-[#eff1f4] rounded-[10px] p-3 mb-3 relative shadow-[0_2px_8px_rgba(0,0,0,0.02)]">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-[#69c73a] font-bold text-[14px]">#{index + 1}</span>
+                <button 
+                  onClick={() => removeItem(item.id)} 
+                  className="text-[#e26463] text-[12px] border border-[#fbdbd9] px-2.5 py-1 rounded-[6px] flex items-center gap-1 bg-[#fff6f6]"
+                >
+                  <span className="text-[10px]">✕</span> 移除
+                </button>
+              </div>
+              <input 
+                type="text" 
+                placeholder="档口名称 (如: B档口)" 
+                value={item.shopName}
+                onChange={(e) => updateItem(item.id, "shopName", e.target.value)}
+                className="w-full text-[14px] py-2 px-3 border border-[#eef0f5] rounded-lg mb-2 outline-none focus:border-[#69c73a] placeholder:text-[#ccc] text-[#333]" 
+              />
+              <input 
+                type="number" 
+                placeholder="¥ 求购金额 (元)" 
+                value={item.requestAmount}
+                onChange={(e) => updateItem(item.id, "requestAmount", e.target.value)}
+                className="w-full text-[14px] py-2 px-3 border border-[#eef0f5] rounded-lg mb-2 outline-none focus:border-[#69c73a] placeholder:text-[#ccc] text-[#333]" 
+              />
+              <textarea 
+                placeholder="补充说明你的需求 (选填)" 
+                value={item.remark}
+                onChange={(e) => updateItem(item.id, "remark", e.target.value)}
+                className="w-full text-[14px] py-2 px-3 border border-[#eef0f5] rounded-lg outline-none hover:border-[#69c73a] focus:border-[#69c73a] placeholder:text-[#ccc] text-[#333] resize-none" 
+                rows={2}
+              />
+            </div>
+          ))}
+          
+          <button 
+            onClick={addItem} 
+            className="w-full border border-dashed border-[#a5d893] bg-[#f5faef] text-[#69c73a] py-2.5 rounded-lg mb-3 font-medium text-[14px] flex items-center justify-center gap-1 active:scale-[0.98] transition-transform"
+          >
+            + 添加一条
+          </button>
+          
+          <button 
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="w-full bg-[#69c73a] text-white rounded-[10px] py-3 font-bold text-[15px] flex items-center justify-center gap-1.5 shadow-[0_4px_12px_rgba(105,199,58,0.3)] active:scale-[0.98] transition-transform disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            <span className="text-[18px]">📢</span> {isSubmitting ? "发布中..." : `批量发布 ${items.length} 条求购信息`}
+          </button>
+        </div>
+
+        <div className="bg-[#eafaf1] p-4 rounded-[12px] border border-[#cdeccd] flex items-start gap-2">
+          <span className="text-[#f5c342] mt-0.5 text-[16px]">💡</span>
+          <div>
+            <div className="font-bold text-[#333] text-[14px] mb-1.5">温馨提示：</div>
+            <div className="text-[12px] text-[#666] leading-[1.8]">
+              • 请如实填写档口名称和求购金额<br/>
+              • 发布后需要管理员审核后方可显示在大厅<br/>
+              • 建议在“设置”中补充联系方式以便他人联系
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
