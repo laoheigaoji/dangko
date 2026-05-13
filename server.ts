@@ -568,8 +568,54 @@ async function startServer() {
         },
       });
 
-      res.json({ qrCode: result.qrCode });
+      res.json({ qrCode: result.qrCode, outTradeNo });
     } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/payment/check-status/:outTradeNo", async (req, res) => {
+    try {
+      const { outTradeNo } = req.params;
+      const order = await Order.findOne({ outTradeNo });
+      if (!order) return res.status(404).json({ error: "Order not found" });
+      
+      if (order.status === 'paid') {
+          return res.json({ paid: true });
+      }
+
+      const alipaySdk = await getAlipaySdk();
+      if (alipaySdk) {
+        const result = await alipaySdk.exec('alipay.trade.query', {
+          bizContent: { out_trade_no: outTradeNo },
+        });
+
+        console.log("Alipay query result:", JSON.stringify(result));
+
+        if (result.tradeStatus === 'TRADE_SUCCESS' || result.tradeStatus === 'TRADE_FINISHED') {
+          order.status = 'paid';
+          order.paidAt = new Date();
+          await order.save();
+          
+          // update user record
+          const update: any = {};
+          if (order.type === 'roi') {
+              update.hasRoi = true;
+          } else if (order.type === 'publish') {
+              update.hasPublish = true;
+          } else {
+              update.isVip = true;
+              update.hasRoi = true;
+              update.hasPublish = true;
+          }
+          await User.findByIdAndUpdate(order.userId, update);
+
+          return res.json({ paid: true });
+        }
+      }
+      res.json({ paid: false }); // not paid yet
+    } catch (e: any) {
+      console.error(e);
       res.status(500).json({ error: e.message });
     }
   });

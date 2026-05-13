@@ -20,6 +20,31 @@ export default function ROI() {
   const [vipPlans, setVipPlans] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [mockOrder, setMockOrder] = useState<any>(null);
+  const [isPaid, setIsPaid] = useState(false);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (mockOrder && mockOrder.outTradeNo && !isPaid) {
+      interval = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/payment/check-status/${mockOrder.outTradeNo}`);
+          const data = await res.json();
+          if (data.paid) {
+            clearInterval(interval);
+            setIsPaid(true);
+            setHasRoi(true);
+            setMockOrder(null);
+            alert('支付成功！已为您开通ROI工具箱权限');
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            localStorage.setItem('user', JSON.stringify({ ...user, hasRoi: true }));
+          }
+        } catch (e) {
+          console.error("Polling error", e);
+        }
+      }, 3000);
+    }
+    return () => clearInterval(interval);
+  }, [mockOrder, isPaid]);
 
   // Merchant Inputs
   const [price, setPrice] = useState("");
@@ -110,7 +135,7 @@ export default function ROI() {
         if (data.qrCode.startsWith('alipays://')) {
           window.location.href = data.qrCode;
         } else {
-          setMockOrder({ qrCode: data.qrCode, plan });
+          setMockOrder({ qrCode: data.qrCode, outTradeNo: data.outTradeNo, plan });
         }
       } else if (data.mock) {
         setMockOrder({ ...data, plan });
