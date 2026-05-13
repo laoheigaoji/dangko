@@ -7,13 +7,16 @@ import _TurnoverItem from "./src/models/TurnoverItem";
 import _BuyItem from "./src/models/BuyItem";
 import _User from "./src/models/User";
 import _Settings from "./src/models/Settings";
+import _Order from "./src/models/Order";
 
 const TurnoverItem = _TurnoverItem as any;
 const BuyItem = _BuyItem as any;
 const User = _User as any;
 const Settings = _Settings as any;
+const Order = _Order as any;
 
 import nodemailer from "nodemailer";
+import { AlipaySdk } from "alipay-sdk";
 
 dotenv.config();
 
@@ -376,6 +379,21 @@ async function startServer() {
     }
   });
 
+  app.get("/api/settings/vip-plans", async (req, res) => {
+    const plans = await Settings.findOne({ key: "vip_plans" });
+    res.json(plans ? plans.value : []);
+  });
+
+  app.post("/api/settings/vip-plans", async (req, res) => {
+    const { plans } = req.body;
+    await Settings.findOneAndUpdate(
+      { key: "vip_plans" },
+      { value: plans },
+      { upsert: true }
+    );
+    res.json({ success: true });
+  });
+
   // Settings
   app.get("/api/settings/notice", async (req, res) => {
     const notice = await Settings.findOne({ key: "notice" });
@@ -433,8 +451,163 @@ async function startServer() {
       );
       console.log("Default Notice configured");
     }
+
+    const vipPlansExisting = await Settings.findOne({ key: "vip_plans" });
+    if (!vipPlansExisting) {
+      await Settings.findOneAndUpdate(
+        { key: "vip_plans" },
+        { 
+          value: [
+            { id: 'month', name: '月度会员', price: '19.9', label: '尝鲜首选', popular: false },
+            { id: 'quarter', name: '季度会员', price: '39.9', label: '超值推荐', popular: true },
+            { id: 'year', name: '年度会员', price: '88', label: '长期经营', popular: false },
+            { id: 'forever', name: '永久会员', price: '188', label: '终身买断', popular: false },
+          ]
+        },
+        { upsert: true }
+      );
+      console.log("Default VIP Plans configured");
+    }
+    const alipayExisting = await Settings.findOne({ key: "alipay" });
+    if (!alipayExisting) {
+      await Settings.findOneAndUpdate(
+        { key: "alipay" },
+        { 
+          value: { 
+            appId: "", 
+            privateKey: "", 
+            alipayPublicKey: "",
+            sandbox: true
+          } 
+        },
+        { upsert: true }
+      );
+      console.log("Default Alipay settings configured");
+    }
   }
   initSettings();
+
+  app.get("/api/settings/alipay", async (req, res) => {
+    const alipay = await Settings.findOne({ key: "alipay" });
+    res.json(alipay ? alipay.value : {});
+  });
+
+  app.post("/api/settings/alipay", async (req, res) => {
+    const { appId, privateKey, alipayPublicKey, sandbox } = req.body;
+    await Settings.findOneAndUpdate(
+      { key: "alipay" },
+      { value: { appId, privateKey, alipayPublicKey, sandbox } },
+      { upsert: true }
+    );
+    res.json({ success: true });
+  });
+
+  // Helper to get Alipay SDK instance
+  async function getAlipaySdk() {
+    const setting = await Settings.findOne({ key: "alipay" });
+    if (!setting || !setting.value.appId || !setting.value.privateKey) {
+      return null;
+    }
+    return new AlipaySdk({
+      appId: setting.value.appId,
+      privateKey: setting.value.privateKey,
+      alipayPublicKey: setting.value.alipayPublicKey,
+      gateway: setting.value.sandbox ? "https://openapi.alipaydev.com/gateway.do" : "https://openapi.alipay.com/gateway.do"
+    });
+  }
+
+  app.post("/api/payment/alipay", async (req, res) => {
+    try {
+      const { userId, planId } = req.body;
+      const user = await User.findById(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      const plansSetting = await Settings.findOne({ key: "vip_plans" });
+      const plan = plansSetting.value.find((p: any) => p.id === planId);
+      if (!plan) return res.status(400).json({ error: "Invalid plan" });
+
+      const alipaySdk = await getAlipaySdk();
+      if (!alipaySdk) {
+        // Mock payment for demo if no keys configured
+        const outTradeNo = `MOCK_${Date.now()}`;
+        const order = new Order({
+          userId: user._id,
+          planId,
+          amount: Number(plan.price),
+          status: "pending",
+          outTradeNo
+        });
+        await order.save();
+        return res.json({ mock: true, outTradeNo });
+      }
+
+      const outTradeNo = `ALIPAY_${Date.now()}`;
+      const order = new Order({
+        userId: user._id,
+        planId,
+        amount: Number(plan.price),
+        status: "pending",
+        outTradeNo
+      });
+      await order.save();
+
+      const result = alipaySdk.pageExec('alipay.trade.page.pay', {
+        bizContent: {
+          out_trade_no: outTradeNo,
+          product_code: 'FAST_INSTANT_TRADE_PAY',
+          total_amount: plan.price,
+          subject: `ROI工具箱 - ${plan.name}`,
+        },
+        returnUrl: `${req.protocol}://${req.get('host')}/payment/success`,
+        notifyUrl: `${req.protocol}://${req.get('host')}/api/payment/alipay/notify`,
+      });
+
+      res.json({ url: result });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Mock payment confirmation endpoint
+  app.post("/api/payment/mock-confirm", async (req, res) => {
+    const { outTradeNo } = req.body;
+    const order = await Order.findOne({ outTradeNo });
+    if (!order) return res.status(404).json({ error: "Order not found" });
+
+    order.status = "paid";
+    order.paidAt = new Date();
+    await order.save();
+
+    await User.findByIdAndUpdate(order.userId, { isVip: true });
+    res.json({ success: true });
+  });
+
+  app.post("/api/payment/alipay/notify", async (req, res) => {
+    try {
+      const alipaySdk = await getAlipaySdk();
+      if (!alipaySdk) return res.send("failure");
+
+      const result = alipaySdk.checkNotifySign(req.body);
+      if (result) {
+        const { out_trade_no, trade_status, trade_no } = req.body;
+        if (trade_status === 'TRADE_SUCCESS' || trade_status === 'TRADE_FINISHED') {
+          const order = await Order.findOne({ outTradeNo: out_trade_no });
+          if (order && order.status !== 'paid') {
+            order.status = 'paid';
+            order.tradeNo = trade_no;
+            order.paidAt = new Date();
+            await order.save();
+            await User.findByIdAndUpdate(order.userId, { isVip: true });
+          }
+        }
+        res.send("success");
+      } else {
+        res.send("failure");
+      }
+    } catch (e) {
+      res.send("failure");
+    }
+  });
 
   app.post("/api/settings/smtp", async (req, res) => {
     const { host, port, user, pass, from } = req.body;

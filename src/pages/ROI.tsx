@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { X, Plus, Trash2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { X, Plus, Trash2, Calculator } from "lucide-react";
 
 type ROIResult = {
   breakEvenROI: string;
@@ -15,9 +15,11 @@ type SKUItem = {
 };
 
 export default function ROI() {
-  const [mode, setMode] = useState<'merchant' | 'daren'>('merchant');
-  const [tab, setTab] = useState<'single' | 'multi'>('single');
-  
+  const [isVip, setIsVip] = useState(false);
+  const [vipPlans, setVipPlans] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [mockOrder, setMockOrder] = useState<any>(null);
+
   // Merchant Inputs
   const [price, setPrice] = useState("");
   const [cost, setCost] = useState("");
@@ -45,6 +47,214 @@ export default function ROI() {
   const [roiResult, setRoiResult] = useState<ROIResult | null>(null);
   const [promoProfit, setPromoProfit] = useState<string | null>(null);
 
+  const [mode, setMode] = useState<'merchant' | 'daren'>('merchant');
+  const [tab, setTab] = useState<'single' | 'multi'>('single');
+
+  useEffect(() => {
+    // Check if user is already VIP
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      fetch(`/api/users/${user.id}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.isVip) {
+            setIsVip(true);
+            const newUser = { ...user, isVip: true };
+            localStorage.setItem('user', JSON.stringify(newUser));
+          }
+        })
+        .catch(() => {
+           if (user.isVip) setIsVip(true);
+        });
+    }
+
+    // Fetch VIP plans
+    fetch('/api/settings/vip-plans')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          setVipPlans(data);
+        } else {
+          // Fallback default plans
+          setVipPlans([
+            { id: 'month', name: '月度会员', price: '19.9', label: '尝鲜首选', popular: false },
+            { id: 'quarter', name: '季度会员', price: '39.9', label: '超值推荐', popular: true },
+            { id: 'year', name: '年度会员', price: '88', label: '长期经营', popular: false },
+            { id: 'forever', name: '永久会员', price: '188', label: '终身买断', popular: false },
+          ]);
+        }
+      });
+  }, []);
+
+  const handlePay = async (plan: any) => {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) {
+      alert('请先登录后购买');
+      window.location.href = '/login';
+      return;
+    }
+    const user = JSON.parse(userStr);
+
+    setLoading(true);
+    try {
+      const res = await fetch('/api/payment/alipay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, planId: plan.id })
+      });
+      const data = await res.json();
+      
+      if (data.url) {
+        window.location.href = data.url;
+      } else if (data.mock) {
+        setMockOrder({ ...data, plan });
+      } else {
+        alert(data.error || '支付发起失败');
+      }
+    } catch (e) {
+      alert('网络错误');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const confirmMockPay = async () => {
+    if (!mockOrder) return;
+    setLoading(true);
+    try {
+      const res = await fetch('/api/payment/mock-confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ outTradeNo: mockOrder.outTradeNo })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('购买成功！已为您开通VIP权限');
+        setIsVip(true);
+        setMockOrder(null);
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        localStorage.setItem('user', JSON.stringify({ ...user, isVip: true }));
+      }
+    } catch (e) {
+      alert('确认支付失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!isVip) {
+    return (
+      <div className="min-h-screen bg-[#f5f6f8] font-sans pb-28">
+        <div className="bg-gradient-to-br from-[#5978f5] to-[#8b55b7] pt-16 pb-12 px-6 text-center text-white rounded-b-[40px] shadow-lg">
+          <div className="w-20 h-20 bg-white/20 rounded-3xl flex items-center justify-center mx-auto mb-6 backdrop-blur-md border border-white/30 rotate-3">
+             <Calculator size={40} />
+          </div>
+          <h1 className="text-2xl font-black mb-3">专业ROI工具箱</h1>
+          <p className="text-sm opacity-80 max-w-[240px] mx-auto leading-relaxed">
+            开通发布权限后即可解锁专业级盈利计算、投流模型分析工具
+          </p>
+        </div>
+
+        <div className="px-5 -mt-6">
+          <div className="grid grid-cols-2 gap-3">
+            {vipPlans.map((plan) => (
+              <div 
+                key={plan.id}
+                onClick={() => handlePay(plan)}
+                className={`bg-white p-5 rounded-2xl border-2 relative overflow-hidden transition-all active:scale-95 ${plan.popular ? 'border-[#7d7cf2] shadow-md' : 'border-transparent'}`}
+              >
+                {plan.popular && (
+                  <div className="absolute top-0 right-0 bg-[#7d7cf2] text-white text-[10px] px-2 py-0.5 rounded-bl-lg font-bold">HOT</div>
+                )}
+                <div className="text-[12px] text-gray-400 mb-1">{plan.label}</div>
+                <div className="text-[16px] font-black text-gray-800">{plan.name}</div>
+                <div className="mt-4 flex items-baseline gap-0.5">
+                  <span className="text-[12px] font-bold text-gray-500">¥</span>
+                  <span className="text-[24px] font-black text-gray-900">{plan.price}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {mockOrder && (
+            <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-6 backdrop-blur-sm">
+                <div className="bg-white w-full rounded-[32px] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+                    <div className="bg-[#7d7cf2] p-8 text-white text-center">
+                        <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/30">
+                            <Calculator size={32} />
+                        </div>
+                        <h3 className="text-xl font-bold">支付确认</h3>
+                        <p className="text-sm opacity-80 mt-1">请核对订单信息并完成支付</p>
+                    </div>
+                    <div className="p-8 space-y-6">
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center text-sm">
+                                <span className="text-gray-400">产品名称</span>
+                                <span className="font-bold text-gray-800">ROI工具箱-{mockOrder.plan.name}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-sm">
+                                <span className="text-gray-400">订单编号</span>
+                                <span className="text-gray-600 font-mono text-xs">{mockOrder.outTradeNo}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-gray-400 text-sm">支付金额</span>
+                                <span className="text-2xl font-black text-[#7d7cf2]">¥{mockOrder.plan.price}</span>
+                            </div>
+                        </div>
+
+                        <div className="pt-2">
+                            <button 
+                                onClick={confirmMockPay}
+                                disabled={loading}
+                                className="w-full py-4 bg-[#7d7cf2] text-white font-black rounded-2xl shadow-lg active:scale-95 transition-all disabled:opacity-50"
+                            >
+                                {loading ? '处理中...' : '模拟支付宝支付'}
+                            </button>
+                            <button 
+                                onClick={() => setMockOrder(null)}
+                                className="w-full mt-3 py-3 text-gray-400 text-sm font-medium"
+                            >
+                                取消订单
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+          )}
+
+          <button 
+            onClick={() => {
+              const firstPlan = vipPlans[0];
+              if (firstPlan) handlePay(firstPlan);
+            }}
+            disabled={loading}
+            className="w-full mt-8 py-4 bg-[#7d7cf2] text-white font-black text-[18px] rounded-2xl shadow-[0_10px_25px_rgba(125,124,242,0.3)] active:scale-[0.98] transition-all disabled:opacity-50"
+          >
+            {loading ? '处理中...' : '立即解锁发布权限'}
+          </button>
+          
+          <div className="mt-8 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-blue-50 rounded-full flex items-center justify-center text-blue-500">✓</div>
+              <div>
+                <p className="text-sm font-bold text-gray-800">专业盈利模型</p>
+                <p className="text-xs text-gray-400">单SKU与多SKU混合销售占比分析</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-purple-50 rounded-full flex items-center justify-center text-purple-500">✓</div>
+              <div>
+                <p className="text-sm font-bold text-gray-800">投流盈亏测算</p>
+                <p className="text-xs text-gray-400">实时测算投产ROI对利润的边际影响</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
   const addSku = () => {
     setSkuList([...skuList, { id: Date.now(), price: "", cost: "", ratio: "1" }]);
   };
@@ -287,8 +497,8 @@ export default function ROI() {
           {mode === 'merchant' && <InputRow label="运费" value={shipFee} onChange={setShipFee} unit="元" showClear onClear={() => setShipFee("")} />}
           {mode === 'merchant' && <InputRow label="赠品成本" value={giftCost} onChange={setGiftCost} unit="元" />}
           {mode === 'merchant' && <InputRow label="其他成本" value={otherCost} onChange={setOtherCost} unit="元" />}
-          <InputRow label="前退款率" value={refundBefore} onChange={setRefundBefore} unit="%" placeholder="发货前退款率" />
-          <InputRow label="后退款率" value={refundAfter} onChange={setRefundAfter} unit="%" placeholder="发货后退款率" />
+          <InputRow label="发货前退款率" value={refundBefore} onChange={setRefundBefore} unit="%" placeholder="发货前退款率" />
+          <InputRow label="发货后退款率" value={refundAfter} onChange={setRefundAfter} unit="%" placeholder="发货后退款率" />
         </div>
       </div>
 

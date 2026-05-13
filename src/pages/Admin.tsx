@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Trash2, Shield, User as UserIcon, LogOut, Info, Check, X } from "lucide-react";
+import { Trash2, Shield, User as UserIcon, LogOut, Info, Check, X, Calculator, CreditCard } from "lucide-react";
 
 export default function Admin() {
   const [users, setUsers] = useState<any[]>([]);
@@ -17,6 +17,46 @@ export default function Admin() {
 
   const [smtp, setSmtp] = useState({ host: '', port: '', user: '', pass: '', from: '' });
   const [notice, setNotice] = useState({ enabled: true, title: '', content: '', date: '' });
+  const [vipPlans, setVipPlans] = useState<any[]>([]);
+  const [alipay, setAlipay] = useState({ appId: '', privateKey: '', alipayPublicKey: '', sandbox: true });
+
+  const fetchAlipay = async () => {
+    const res = await fetch('/api/settings/alipay');
+    const data = await res.json();
+    if (data) setAlipay(data);
+  };
+
+  const saveAlipay = async () => {
+    try {
+      await fetch('/api/settings/alipay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(alipay)
+      });
+      alert('支付宝配置已保存');
+    } catch (e) {
+      alert('保存失败');
+    }
+  };
+
+  const fetchVipPlans = async () => {
+    const res = await fetch('/api/settings/vip-plans');
+    const data = await res.json();
+    if (data) setVipPlans(data);
+  };
+
+  const saveVipPlans = async () => {
+    try {
+      await fetch('/api/settings/vip-plans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plans: vipPlans })
+      });
+      alert('VIP计划设置已保存');
+    } catch (e) {
+      alert('保存失败');
+    }
+  };
 
   const fetchNotice = async () => {
     const res = await fetch('/api/settings/notice');
@@ -99,6 +139,8 @@ export default function Admin() {
       fetchData();
       fetchSmtp();
       fetchNotice();
+      fetchVipPlans();
+      fetchAlipay();
     } catch (e) {
       console.error("Auth verify failed:", e);
       localStorage.removeItem("adminUser");
@@ -595,6 +637,133 @@ export default function Admin() {
                 className="w-full bg-blue-500 text-white font-bold py-3 rounded-lg hover:bg-blue-600 transition-colors"
               >
                 保存公告配置
+              </button>
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow-sm space-y-4">
+              <h2 className="text-lg font-bold text-gray-800 border-b pb-2 flex items-center gap-2">
+                <Calculator size={18} className="text-[#7d7cf2]" />
+                VIP 会员价格设置
+              </h2>
+              <div className="space-y-4">
+                {vipPlans.map((plan, idx) => (
+                  <div key={idx} className="p-4 bg-gray-50 rounded-xl border border-gray-100 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-bold text-gray-700">{plan.name}</span>
+                      <div className="flex items-center gap-2">
+                        <label className="text-[10px] text-gray-400">推荐</label>
+                        <input 
+                          type="checkbox" 
+                          checked={plan.popular} 
+                          onChange={e => {
+                            const newPlans = [...vipPlans];
+                            newPlans[idx].popular = e.target.checked;
+                            setVipPlans(newPlans);
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] text-gray-400 mb-1">显示名称</label>
+                        <input 
+                          type="text" 
+                          value={plan.name} 
+                          onChange={e => {
+                            const newPlans = [...vipPlans];
+                            newPlans[idx].name = e.target.value;
+                            setVipPlans(newPlans);
+                          }}
+                          className="w-full border rounded px-2 py-1.5 text-xs outline-none focus:border-gray-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-400 mb-1">价格 (元)</label>
+                        <input 
+                          type="text" 
+                          value={plan.price} 
+                          onChange={e => {
+                            const newPlans = [...vipPlans];
+                            newPlans[idx].price = e.target.value;
+                            setVipPlans(newPlans);
+                          }}
+                          className="w-full border rounded px-2 py-1.5 text-xs outline-none focus:border-gray-800"
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block text-[10px] text-gray-400 mb-1">标签</label>
+                        <input 
+                          type="text" 
+                          value={plan.label} 
+                          onChange={e => {
+                            const newPlans = [...vipPlans];
+                            newPlans[idx].label = e.target.value;
+                            setVipPlans(newPlans);
+                          }}
+                          className="w-full border rounded px-2 py-1.5 text-xs outline-none focus:border-gray-800"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button 
+                onClick={saveVipPlans}
+                className="w-full bg-[#7d7cf2] text-white font-bold py-3 rounded-lg hover:opacity-90 transition-colors"
+              >
+                保存VIP价格配置
+              </button>
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow-sm space-y-4">
+              <h2 className="text-lg font-bold text-gray-800 border-b pb-2 flex items-center gap-2">
+                <CreditCard size={18} className="text-blue-500" />
+                支付宝支付配置
+              </h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">APP ID</label>
+                  <input 
+                    type="text" 
+                    value={alipay.appId} 
+                    onChange={e => setAlipay({ ...alipay, appId: e.target.value })}
+                    className="w-full border rounded px-3 py-2 outline-none focus:border-gray-800"
+                    placeholder="支付宝应用AppID"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">应用私钥 (privateKey)</label>
+                  <textarea 
+                    value={alipay.privateKey} 
+                    onChange={e => setAlipay({ ...alipay, privateKey: e.target.value })}
+                    className="w-full border rounded px-3 py-2 outline-none focus:border-gray-800 h-24 font-mono text-xs"
+                    placeholder="应用私钥"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-1">支付宝公钥 (alipayPublicKey)</label>
+                  <textarea 
+                    value={alipay.alipayPublicKey} 
+                    onChange={e => setAlipay({ ...alipay, alipayPublicKey: e.target.value })}
+                    className="w-full border rounded px-3 py-2 outline-none focus:border-gray-800 h-24 font-mono text-xs"
+                    placeholder="支付宝公钥（非应用公钥）"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="checkbox" 
+                    id="sandbox"
+                    checked={alipay.sandbox} 
+                    onChange={e => setAlipay({ ...alipay, sandbox: e.target.checked })}
+                  />
+                  <label htmlFor="sandbox" className="text-sm text-gray-600">启用沙箱环境 (Sandbox)</label>
+                </div>
+              </div>
+              <button 
+                onClick={saveAlipay}
+                className="w-full bg-blue-500 text-white font-bold py-3 rounded-lg hover:opacity-90 transition-colors"
+              >
+                保存支付宝配置
               </button>
             </div>
 
