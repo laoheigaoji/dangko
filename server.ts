@@ -3,10 +3,10 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import TurnoverItem from "./src/models/TurnoverItem.js";
-import BuyItem from "./src/models/BuyItem.js";
-import User from "./src/models/User.js";
-import Settings from "./src/models/Settings.js";
+import TurnoverItem from "./src/models/TurnoverItem.ts";
+import BuyItem from "./src/models/BuyItem.ts";
+import User from "./src/models/User.ts";
+import Settings from "./src/models/Settings.ts";
 import nodemailer from "nodemailer";
 
 dotenv.config();
@@ -15,52 +15,86 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // MongoDB connection
-  const MONGODB_URI = process.env.MONGODB_URI;
-  if (!MONGODB_URI) {
-    console.error("MONGODB_URI environment variable is not defined");
-    process.exit(1);
-  }
-
-  try {
-    await mongoose.connect(MONGODB_URI);
+  // MongoDB connection (Non-blocking start)
+  const MONGODB_URI = "mongodb+srv://752675:Aa752675@cluster0.simmm5o.mongodb.net/dangkou";
+  
+  mongoose.connect(MONGODB_URI).then(async () => {
     console.log("Connected to MongoDB successfully");
     
     // Seed data if empty
-    const turnoverCount = await TurnoverItem.countDocuments();
-    if (turnoverCount === 0) {
-      await TurnoverItem.insertMany([
-        { shopName: '三鼠', originalPrice: 1248, transferPrice: 1130, userName: '用户1418', description: '高性价比', views: 8, wx: '13544409629', qq: '2522747697', status: 'approved' },
-        { shopName: '本色', originalPrice: 60, transferPrice: 50, userName: '用户5907', description: '没有货款，只有裤子1015一条', views: 2, status: 'approved' },
-      ]);
-      console.log("Turnover items seeded");
-    }
-    
-    const buyCount = await BuyItem.countDocuments();
-    if (buyCount === 0) {
-      await BuyItem.insertMany([
-        { shopName: '缤客', requestAmount: 100000, userName: '用户3191', remark: '多少都收', phone: '17322023191', status: 'approved' },
-      ]);
-      console.log("Buy items seeded");
-    }
+    try {
+      const turnoverCount = await TurnoverItem.countDocuments();
+      if (turnoverCount === 0) {
+        await TurnoverItem.insertMany([
+          { shopName: '三鼠', originalPrice: 1248, transferPrice: 1130, userName: '用户1418', description: '高性价比', views: 8, wx: '13544409629', qq: '2522747697', status: 'approved' },
+          { shopName: '本色', originalPrice: 60, transferPrice: 50, userName: '用户5907', description: '没有货款，只有裤子1015一条', views: 2, status: 'approved' },
+        ]);
+        console.log("Turnover items seeded");
+      }
+      
+      const buyCount = await BuyItem.countDocuments();
+      if (buyCount === 0) {
+        await BuyItem.insertMany([
+          { shopName: '缤客', requestAmount: 100000, userName: '用户3191', remark: '多少都收', phone: '17322023191', status: 'approved' },
+        ]);
+        console.log("Buy items seeded");
+      }
 
-    const adminExists = await User.findOne({ phone: "admin" });
-    if (!adminExists) {
-      const adminUser = new User({ phone: "admin", password: "admin888", isVip: true });
-      await adminUser.save();
-      console.log("Admin seeded");
+      // Seed admin user with upsert to ensure credentials
+      await User.findOneAndUpdate(
+        { phone: "admin" },
+        { 
+          phone: "admin", 
+          password: "admin888", 
+          isVip: true 
+        },
+        { upsert: true, new: true }
+      );
+      console.log("Admin user 'admin' with password 'admin888' is ready");
+
+      // Initialize Default SMTP if not exists
+      const existingSmtp = await Settings.findOne({ key: "smtp" });
+      if (!existingSmtp) {
+        await Settings.findOneAndUpdate(
+          { key: "smtp" },
+          { 
+            value: { 
+              host: "smtp.qq.com", 
+              port: "465", 
+              user: "1546912750@qq.com", 
+              password: "cdsoxmjsuolohjci", // Note: field was 'pass' in some places, 'password' here? Checking...
+              pass: "cdsoxmjsuolohjci",
+              from: "1546912750@qq.com" 
+            } 
+          },
+          { upsert: true }
+        );
+        console.log("Default SMTP configured");
+      }
+    } catch (seedErr) {
+      console.error("Error during seeding:", seedErr);
     }
-  } catch (err) {
+  }).catch(err => {
     console.error("Failed to connect to MongoDB", err);
-    process.exit(1);
-  }
+  });
 
   // Middleware
   app.use(express.json());
 
+  // Check DB connection middleware for API routes
+  app.use("/api", (req, res, next) => {
+    if (mongoose.connection.readyState !== 1 && req.path !== "/health") {
+      return res.status(503).json({ 
+        error: "Database not connected", 
+        message: "Database connection failed. Please check the hardcoded connection string in server.ts." 
+      });
+    }
+    next();
+  });
+
   // API routes
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok" });
+    res.json({ status: "ok", db: mongoose.connection.readyState });
   });
 
   // Notification Helper
@@ -142,6 +176,7 @@ async function startServer() {
   app.post("/api/auth/register", async (req, res) => {
     try {
       const { phone, password, email, code } = req.body;
+      if (phone === "admin") return res.status(400).json({ error: "保留账号，不可注册" });
       const existingUser = await User.findOne({ phone });
       if (existingUser) return res.status(400).json({ error: "该账号已存在，请直接登录" });
 
@@ -163,13 +198,22 @@ async function startServer() {
   });
 
   app.post("/api/auth/login", async (req, res) => {
+    console.log("Login request received:", req.body.phone);
     try {
       const { phone, password } = req.body;
       const user = await User.findOne({ phone });
-      if (!user) return res.status(404).json({ error: "账号不存在，请先注册" });
-      if (user.password !== password) return res.status(401).json({ error: "密码错误，请重新输入" });
+      if (!user) {
+        console.log("User not found:", phone);
+        return res.status(404).json({ error: "账号不存在，请先注册" });
+      }
+      if (user.password !== password) {
+        console.log("Password incorrect for user:", phone);
+        return res.status(401).json({ error: "密码错误，请重新输入" });
+      }
+      console.log("Login successful:", phone);
       res.json({ user: { id: user._id, phone: user.phone, isVip: user.isVip } });
     } catch (e) {
+      console.error("Login error:", e);
       res.status(500).json({ error: "登录失败，请稍后再试" });
     }
   });

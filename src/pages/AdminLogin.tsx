@@ -15,12 +15,16 @@ export default function AdminLogin() {
     }
     setError("");
     setLoading(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, password })
+        body: JSON.stringify({ phone, password }),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
       const data = await res.json();
       if (res.ok) {
         if (data.user.phone !== "admin") {
