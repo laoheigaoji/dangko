@@ -15,7 +15,7 @@ type SKUItem = {
 };
 
 export default function ROI() {
-  const [isVip, setIsVip] = useState(false);
+  const [hasRoi, setHasRoi] = useState(false);
   const [vipPlans, setVipPlans] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [mockOrder, setMockOrder] = useState<any>(null);
@@ -58,14 +58,14 @@ export default function ROI() {
       fetch(`/api/users/${user.id}`)
         .then(res => res.json())
         .then(data => {
-          if (data && data.isVip) {
-            setIsVip(true);
-            const newUser = { ...user, isVip: true };
+          if (data && (data.hasRoi || data.isVip)) {
+            setHasRoi(true);
+            const newUser = { ...user, hasRoi: data.hasRoi, isVip: data.isVip };
             localStorage.setItem('user', JSON.stringify(newUser));
           }
         })
         .catch(() => {
-           if (user.isVip) setIsVip(true);
+           if (user.hasRoi || user.isVip) setHasRoi(true);
         });
     }
 
@@ -101,7 +101,7 @@ export default function ROI() {
       const res = await fetch('/api/payment/alipay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, planId: plan.id })
+        body: JSON.stringify({ userId: user.id, planId: plan.id, type: 'roi' })
       });
       const data = await res.json();
       
@@ -130,11 +130,11 @@ export default function ROI() {
       });
       const data = await res.json();
       if (data.success) {
-        alert('购买成功！已为您开通VIP权限');
-        setIsVip(true);
+        alert('购买成功！已为您开通ROI工具箱权限');
+        setHasRoi(true);
         setMockOrder(null);
         const user = JSON.parse(localStorage.getItem('user') || '{}');
-        localStorage.setItem('user', JSON.stringify({ ...user, isVip: true }));
+        localStorage.setItem('user', JSON.stringify({ ...user, hasRoi: true }));
       }
     } catch (e) {
       alert('确认支付失败');
@@ -143,7 +143,7 @@ export default function ROI() {
     }
   };
 
-  if (!isVip) {
+  if (!hasRoi) {
     return (
       <div className="min-h-screen bg-[#f5f6f8] font-sans pb-28">
         <div className="bg-gradient-to-br from-[#5978f5] to-[#8b55b7] pt-16 pb-12 px-6 text-center text-white rounded-b-[40px] shadow-lg">
@@ -152,7 +152,7 @@ export default function ROI() {
           </div>
           <h1 className="text-2xl font-black mb-3">专业ROI工具箱</h1>
           <p className="text-sm opacity-80 max-w-[240px] mx-auto leading-relaxed">
-            开通发布权限后即可解锁专业级盈利计算、投流模型分析工具
+            购买ROI工具箱套餐后即可解锁专业级盈利计算、投流模型分析工具
           </p>
         </div>
 
@@ -231,7 +231,7 @@ export default function ROI() {
             disabled={loading}
             className="w-full mt-8 py-4 bg-[#7d7cf2] text-white font-black text-[18px] rounded-2xl shadow-[0_10px_25px_rgba(125,124,242,0.3)] active:scale-[0.98] transition-all disabled:opacity-50"
           >
-            {loading ? '处理中...' : '立即解锁发布权限'}
+            {loading ? '处理中...' : '立即解锁ROI工具箱'}
           </button>
           
           <div className="mt-8 space-y-4">

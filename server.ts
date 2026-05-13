@@ -518,7 +518,7 @@ async function startServer() {
 
   app.post("/api/payment/alipay", async (req, res) => {
     try {
-      const { userId, planId } = req.body;
+      const { userId, planId, type } = req.body;
       const user = await User.findById(userId);
       if (!user) return res.status(404).json({ error: "User not found" });
 
@@ -533,6 +533,7 @@ async function startServer() {
         const order = new Order({
           userId: user._id,
           planId,
+          type: type || "publish",
           amount: Number(plan.price),
           status: "pending",
           outTradeNo
@@ -545,18 +546,20 @@ async function startServer() {
       const order = new Order({
         userId: user._id,
         planId,
+        type: type || "publish",
         amount: Number(plan.price),
         status: "pending",
         outTradeNo
       });
       await order.save();
 
+      const subject = type === 'roi' ? `ROI工具箱 - ${plan.name}` : `发布权限 - ${plan.name}`;
       const result = alipaySdk.pageExec('alipay.trade.page.pay', {
         bizContent: {
           out_trade_no: outTradeNo,
           product_code: 'FAST_INSTANT_TRADE_PAY',
           total_amount: plan.price,
-          subject: `ROI工具箱 - ${plan.name}`,
+          subject: subject,
         },
         returnUrl: `${req.protocol}://${req.get('host')}/payment/success`,
         notifyUrl: `${req.protocol}://${req.get('host')}/api/payment/alipay/notify`,
@@ -578,7 +581,18 @@ async function startServer() {
     order.paidAt = new Date();
     await order.save();
 
-    await User.findByIdAndUpdate(order.userId, { isVip: true });
+    const update: any = {};
+    if (order.type === 'roi') update.hasRoi = true;
+    else if (order.type === 'publish') {
+      update.hasPublish = true;
+      update.isVip = true;
+    } else {
+      update.isVip = true;
+      update.hasRoi = true;
+      update.hasPublish = true;
+    }
+    
+    await User.findByIdAndUpdate(order.userId, update);
     res.json({ success: true });
   });
 
@@ -597,7 +611,18 @@ async function startServer() {
             order.tradeNo = trade_no;
             order.paidAt = new Date();
             await order.save();
-            await User.findByIdAndUpdate(order.userId, { isVip: true });
+
+            const update: any = {};
+            if (order.type === 'roi') update.hasRoi = true;
+            else if (order.type === 'publish') {
+              update.hasPublish = true;
+              update.isVip = true;
+            } else {
+              update.isVip = true;
+              update.hasRoi = true;
+              update.hasPublish = true;
+            }
+            await User.findByIdAndUpdate(order.userId, update);
           }
         }
         res.send("success");

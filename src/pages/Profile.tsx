@@ -34,7 +34,14 @@ export default function Profile() {
       <div className="bg-gradient-to-br from-[#5978f5] to-[#8b55b7] pt-[40px] pb-[20px] px-4 text-white text-center rounded-b-[20px] shadow-sm relative overflow-hidden">
         <h1 className="text-[28px] font-black mb-2 tracking-wider" style={{textShadow: "0 2px 4px rgba(0,0,0,0.15)"}}>用户</h1>
         <p className="text-[14px] opacity-90 tracking-wide font-light">{user.phone}</p>
-        <p className="text-[12px] opacity-80 mt-1">{user.isVip ? '已开通发布权限' : '未开通发布权限'}</p>
+        <div className="flex flex-col gap-1 mt-2">
+            <p className="text-[11px] opacity-90">
+                {user.hasPublish || user.isVip ? '✅ 已开通发布权限' : '❌ 未开通发布权限'}
+            </p>
+            <p className="text-[11px] opacity-90">
+                {user.hasRoi || user.isVip ? '✅ 已开通ROI工具箱' : '❌ 未开通ROI工具箱'}
+            </p>
+        </div>
       </div>
       
       <div className="px-3 mt-4">

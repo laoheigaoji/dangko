@@ -8,6 +8,8 @@ export interface IUser {
   qq?: string;
   password?: string;
   isVip: boolean;
+  hasRoi: boolean;
+  hasPublish: boolean;
   favorites: string[]; // item IDs
   subscriptions: { shopName: string; turnover: boolean; buy: boolean }[];
   createdAt: Date;
@@ -20,6 +22,8 @@ const userSchema = new mongoose.Schema({
   wx: { type: String },
   qq: { type: String },
   isVip: { type: Boolean, default: false },
+  hasRoi: { type: Boolean, default: false },
+  hasPublish: { type: Boolean, default: false },
   favorites: { type: [String], default: [] },
   subscriptions: [{
     shopName: String,

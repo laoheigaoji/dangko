@@ -111,7 +111,7 @@ export default function Turnover() {
       return;
     }
     const user = JSON.parse(userStr);
-    if (!user.isVip) {
+    if (!user.hasPublish && !user.isVip) {
       setShowPublishWarning(true);
     } else {
       navigate('/profile/publish-turnover');
