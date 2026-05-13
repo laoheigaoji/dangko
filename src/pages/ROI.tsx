@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { X, Plus, Trash2, Calculator } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 
 type ROIResult = {
   breakEvenROI: string;
@@ -105,24 +106,11 @@ export default function ROI() {
       });
       const data = await res.json();
       
-      if (data.url) {
-        // 支付宝可能返回 HTML 表单或纯连接
-        if (data.url.includes('<form')) {
-          const div = document.createElement('div');
-          div.innerHTML = data.url;
-          document.body.appendChild(div);
-          const form = div.querySelector('form');
-          if (form) {
-            form.submit();
-          } else {
-            // 如果没找到 form，尝试解析 action
-            const actionMatch = data.url.match(/action="([^"]+)"/);
-            if (actionMatch && actionMatch[1]) {
-                window.location.href = actionMatch[1];
-            }
-          }
+      if (data.qrCode) {
+        if (data.qrCode.startsWith('alipays://')) {
+          window.location.href = data.qrCode;
         } else {
-          window.location.href = data.url;
+          setMockOrder({ qrCode: data.qrCode, plan });
         }
       } else if (data.mock) {
         setMockOrder({ ...data, plan });
@@ -205,36 +193,51 @@ export default function ROI() {
                         <p className="text-sm opacity-80 mt-1">请核对订单信息并完成支付</p>
                     </div>
                     <div className="p-8 space-y-6">
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-center text-sm">
-                                <span className="text-gray-400">产品名称</span>
-                                <span className="font-bold text-gray-800">ROI工具箱-{mockOrder.plan.name}</span>
+                        {mockOrder.qrCode ? (
+                          <div className="flex flex-col items-center">
+                            <QRCodeSVG value={mockOrder.qrCode} size={200} />
+                            <p className="text-sm text-gray-500 mt-4">请截图二维码，使用支付宝扫码完成支付</p>
+                            <button 
+                              onClick={() => setMockOrder(null)}
+                              className="w-full mt-6 py-3 text-gray-400 text-sm font-medium"
+                            >
+                                我已支付 / 取消
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="space-y-4">
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-400">产品名称</span>
+                                    <span className="font-bold text-gray-800">ROI工具箱-{mockOrder.plan.name}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-400">订单编号</span>
+                                    <span className="text-gray-600 font-mono text-xs">{mockOrder.outTradeNo}</span>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-gray-400 text-sm">支付金额</span>
+                                    <span className="text-2xl font-black text-[#7d7cf2]">¥{mockOrder.plan.price}</span>
+                                </div>
                             </div>
-                            <div className="flex justify-between items-center text-sm">
-                                <span className="text-gray-400">订单编号</span>
-                                <span className="text-gray-600 font-mono text-xs">{mockOrder.outTradeNo}</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-gray-400 text-sm">支付金额</span>
-                                <span className="text-2xl font-black text-[#7d7cf2]">¥{mockOrder.plan.price}</span>
-                            </div>
-                        </div>
 
-                        <div className="pt-2">
-                            <button 
-                                onClick={confirmMockPay}
-                                disabled={loading}
-                                className="w-full py-4 bg-[#7d7cf2] text-white font-black rounded-2xl shadow-lg active:scale-95 transition-all disabled:opacity-50"
-                            >
-                                {loading ? '处理中...' : '模拟支付宝支付'}
-                            </button>
-                            <button 
-                                onClick={() => setMockOrder(null)}
-                                className="w-full mt-3 py-3 text-gray-400 text-sm font-medium"
-                            >
-                                取消订单
-                            </button>
-                        </div>
+                            <div className="pt-2">
+                                <button 
+                                    onClick={confirmMockPay}
+                                    disabled={loading}
+                                    className="w-full py-4 bg-[#7d7cf2] text-white font-black rounded-2xl shadow-lg active:scale-95 transition-all disabled:opacity-50"
+                                >
+                                    {loading ? '处理中...' : '模拟支付宝支付'}
+                                </button>
+                                <button 
+                                    onClick={() => setMockOrder(null)}
+                                    className="w-full mt-3 py-3 text-gray-400 text-sm font-medium"
+                                >
+                                    取消订单
+                                </button>
+                            </div>
+                          </>
+                        )}
                     </div>
                 </div>
             </div>

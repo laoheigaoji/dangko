@@ -560,18 +560,15 @@ async function startServer() {
       await order.save();
 
       const subject = type === 'roi' ? `ROI工具箱 - ${plan.name}` : `发布权限 - ${plan.name}`;
-      const result = await alipaySdk.pageExec('alipay.trade.page.pay', {
+      const result = await alipaySdk.exec('alipay.trade.precreate', {
         bizContent: {
           out_trade_no: outTradeNo,
-          product_code: 'FAST_INSTANT_TRADE_PAY',
           total_amount: plan.price,
           subject: subject,
         },
-        returnUrl: `${req.protocol}://${req.get('host')}/payment/success`,
-        notifyUrl: `${req.protocol}://${req.get('host')}/api/payment/alipay/notify`,
-      } as any, { method: 'GET' });
+      });
 
-      res.json({ url: result });
+      res.json({ qrCode: result.qrCode });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
