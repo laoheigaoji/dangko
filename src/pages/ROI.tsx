@@ -1,359 +1,348 @@
-import { useState, useEffect } from "react";
-import { Calculator, Info, RotateCcw } from "lucide-react";
+import { useState } from "react";
+import { X, Plus, Trash2 } from "lucide-react";
 
-type Version = 'influencer' | 'merchant';
+type ROIResult = {
+  breakEvenROI: string;
+  profitRate: string;
+  breakEvenBid: string;
+};
+
+type SKUItem = {
+  id: number;
+  price: string;
+  cost: string;
+  ratio: string; // Weight or estimated sales ratio
+};
 
 export default function ROI() {
-  const [version, setVersion] = useState<Version>('influencer');
+  const [tab, setTab] = useState<'single' | 'multi'>('single');
   
-  // Influencer Inputs
-  const [infPrice, setInfPrice] = useState("");
-  const [infComm, setInfComm] = useState("");
-  const [infReturn, setInfReturn] = useState("0");
-  const [infWithdraw, setInfWithdraw] = useState("0");
-  const [infRefund1h, setInfRefund1h] = useState("0");
+  // Single SKU Inputs
+  const [price, setPrice] = useState("");
+  const [cost, setCost] = useState("");
+  
+  // Multi SKU Inputs
+  const [skuList, setSkuList] = useState<SKUItem[]>([
+    { id: Date.now(), price: "", cost: "", ratio: "1" }
+  ]);
 
-  // Merchant Inputs
-  const [merPrice, setMerPrice] = useState("");
-  const [merCost, setMerCost] = useState("");
-  const [merReturn, setMerReturn] = useState("0");
-  const [merPlatform, setMerPlatform] = useState("0");
-  const [merRefund1h, setMerRefund1h] = useState("0");
+  // Common Inputs
+  const [platformPoint, setPlatformPoint] = useState("");
+  const [shipFee, setShipFee] = useState("");
+  const [giftCost, setGiftCost] = useState("");
+  const [otherCost, setOtherCost] = useState("");
+  const [refundBefore, setRefundBefore] = useState("");
+  const [refundAfter, setRefundAfter] = useState("");
 
-  const [results, setResults] = useState<any>(null);
+  // Inputs for Promotion Profit/Loss
+  const [actualSpend, setActualSpend] = useState("");
+  const [actualROI, setActualROI] = useState("");
+  const [extraFees, setExtraFees] = useState("");
 
-  const calculateInfluencer = () => {
-    if (!infPrice || !infComm) {
-      alert("请填写关键必填项（商品价格、佣金率）");
+  const [roiResult, setRoiResult] = useState<ROIResult | null>(null);
+  const [promoProfit, setPromoProfit] = useState<string | null>(null);
+
+  const addSku = () => {
+    setSkuList([...skuList, { id: Date.now(), price: "", cost: "", ratio: "1" }]);
+  };
+
+  const removeSku = (id: number) => {
+    if (skuList.length > 1) {
+      setSkuList(skuList.filter(item => item.id !== id));
+    }
+  };
+
+  const updateSku = (id: number, field: keyof SKUItem, value: string) => {
+    setSkuList(skuList.map(item => item.id === id ? { ...item, [field]: value } : item));
+  };
+
+  const handleCalculateROI = () => {
+    const pp = Number(platformPoint) / 100 || 0;
+    const sf = Number(shipFee) || 0;
+    const gc = Number(giftCost) || 0;
+    const oc = Number(otherCost) || 0;
+    const rb = Number(refundBefore) / 100 || 0;
+    const ra = Number(refundAfter) / 100 || 0;
+
+    let avgP = 0;
+    let avgC = 0;
+
+    if (tab === 'single') {
+      avgP = Number(price);
+      avgC = Number(cost);
+    } else {
+      let totalRatio = 0;
+      let weightedP = 0;
+      let weightedC = 0;
+      
+      skuList.forEach(sku => {
+        const r = Number(sku.ratio) || 0;
+        weightedP += (Number(sku.price) || 0) * r;
+        weightedC += (Number(sku.cost) || 0) * r;
+        totalRatio += r;
+      });
+
+      if (totalRatio === 0) {
+        alert("请输入有效的销售比例");
+        return;
+      }
+      avgP = weightedP / totalRatio;
+      avgC = weightedC / totalRatio;
+    }
+
+    if (!avgP) {
+      alert("请输入有效的价格");
       return;
     }
-    const price = Number(infPrice);
-    const comm = Number(infComm) / 100;
-    const ret = Number(infReturn) / 100;
-    const withdraw = Number(infWithdraw) / 100;
-    const refund1h = Number(infRefund1h) / 100;
 
-    // Based on the formula: Break-even ROI = Price / NetRevenue
-    // NetRevenue = Price * Comm * (1 - 1hRefund) * (1 - ReturnRate) * (1 - WithdrawalFee)
-    const netRevenuePerOrder = price * comm * (1 - refund1h) * (1 - ret) * (1 - withdraw);
-    
-    if (netRevenuePerOrder <= 0) {
-      alert("纯利润过低，无法计算ROI（请检查费率设置）");
+    const effectiveRevenue = avgP * (1 - pp) * (1 - rb) * (1 - ra);
+    const totalCosts = (avgC + gc + oc) * (1 - rb) + sf * (1 - rb); 
+    const profit = effectiveRevenue - totalCosts;
+    const profitRate = (profit / effectiveRevenue) * 100;
+    const breakEvenROI = 1 / (profit / effectiveRevenue);
+
+    if (profit <= 0) {
+      alert("利润计算结果为负，请检查输入参数");
+      setRoiResult(null);
       return;
     }
 
-    const breakEvenROI = price / netRevenuePerOrder;
-
-    setResults({
-      type: 'influencer',
-      breakEvenROI: breakEvenROI.toFixed(3),
-      estimatedROI: (price / (price * comm)).toFixed(3), // Base ROI without fees
-      grossProfit: (price * comm).toFixed(2),
-      netProfit: (netRevenuePerOrder).toFixed(2),
-      netROI: breakEvenROI.toFixed(3)
+    setRoiResult({
+      breakEvenROI: isFinite(breakEvenROI) ? breakEvenROI.toFixed(2) : "--",
+      profitRate: profitRate.toFixed(2) + "%",
+      breakEvenBid: profit.toFixed(2)
     });
   };
 
-  const calculateMerchant = () => {
-    if (!merPrice || !merCost) {
-      alert("请填写关键必填项（商品售价、成本）");
+  const handleCalculatePromoProfit = () => {
+    const spend = Number(actualSpend);
+    const roiInput = Number(actualROI);
+    const extra = Number(extraFees);
+    const pp = Number(platformPoint) / 100 || 0;
+    const sf = Number(shipFee) || 0;
+    const rb = Number(refundBefore) / 100 || 0;
+    const ra = Number(refundAfter) / 100 || 0;
+
+    let avgP = 0;
+    let avgC = 0;
+
+    if (tab === 'single') {
+      avgP = Number(price);
+      avgC = Number(cost);
+    } else {
+      let totalRatio = 0;
+      let weightedP = 0;
+      let weightedC = 0;
+      skuList.forEach(sku => {
+        const r = Number(sku.ratio) || 0;
+        weightedP += (Number(sku.price) || 0) * r;
+        weightedC += (Number(sku.cost) || 0) * r;
+        totalRatio += r;
+      });
+      avgP = weightedP / totalRatio;
+      avgC = weightedC / totalRatio;
+    }
+
+    if (!avgP || !spend || !roiInput) {
+      alert("请完整填写必要参数（包含ROI计算中的价格/成本，以及本栏花费和ROI）");
       return;
     }
-    const price = Number(merPrice);
-    const cost = Number(merCost);
-    const ret = Number(merReturn) / 100;
-    const platform = Number(merPlatform) / 100;
-    const refund1h = Number(merRefund1h) / 100;
 
-    const grossProfit = price * (1 - platform) - cost;
-    const netProfitPerSale = grossProfit * (1 - refund1h) * (1 - ret);
+    const sales = roiInput * spend;
+    const orders = sales / avgP;
     
-    if (netProfitPerSale <= 0) {
-      alert("利润为负或过低，无法计算ROI");
-      return;
-    }
+    const netRevenue = sales * (1 - pp) * (1 - rb) * (1 - ra);
+    const totalProductCosts = (avgC * orders) * (1 - rb);
+    const totalShipping = (sf * orders) * (1 - rb);
+    
+    const profit = netRevenue - totalProductCosts - totalShipping - spend - extra;
 
-    const grossProfitRate = (grossProfit / price) * 100;
-    const netProfitRate = (netProfitPerSale / price) * 100;
-    const breakEvenROI = price / netProfitPerSale;
-
-    setResults({
-      type: 'merchant',
-      breakEvenROI: breakEvenROI.toFixed(3),
-      estimatedROI: (price / grossProfit).toFixed(3),
-      grossProfit: grossProfit.toFixed(2),
-      netProfit: netProfitPerSale.toFixed(2),
-      grossProfitRate: grossProfitRate.toFixed(2),
-      netProfitRate: netProfitRate.toFixed(2)
-    });
+    setPromoProfit(profit.toFixed(2));
   };
 
-  useEffect(() => {
-    setResults(null); 
-  }, [version]);
-
-  return (
-    <div className="min-h-screen bg-[#f5f7fa] pb-24 font-sans">
-      {/* Tab Switcher */}
-      <div className="bg-white px-6 pt-10 pb-4 shadow-sm relative z-10">
-        <div className="flex bg-[#f0f2f5] p-1 rounded-xl">
-          <button 
-            onClick={() => setVersion('influencer')}
-            className={`flex-1 py-2.5 rounded-lg text-[14px] font-bold transition-all ${version === 'influencer' ? 'bg-white text-[#44a0fe] shadow-sm' : 'text-[#8a919f]'}`}
-          >
-            达人版
-          </button>
-          <button 
-            onClick={() => setVersion('merchant')}
-            className={`flex-1 py-2.5 rounded-lg text-[14px] font-bold transition-all ${version === 'merchant' ? 'bg-white text-[#44a0fe] shadow-sm' : 'text-[#8a919f]'}`}
-          >
-            商家版
-          </button>
-        </div>
+  const InputRow = ({ 
+    label, 
+    value, 
+    onChange, 
+    unit, 
+    showClear = false,
+    placeholder = "0",
+    onClear 
+  }: { 
+    label: string; 
+    value: string; 
+    onChange: (v: string) => void; 
+    unit: string;
+    showClear?: boolean;
+    placeholder?: string;
+    onClear?: () => void;
+  }) => (
+    <div className="flex items-center justify-between py-4 px-4 border-b border-gray-100 bg-white">
+      <div className="flex items-center gap-1 min-w-[100px]">
+        <span className="text-red-500 text-lg leading-none mt-1">*</span>
+        <span className="text-[15px] text-gray-700 font-medium">{label}</span>
       </div>
-
-      <div className="px-5 mt-6">
-        <div className="mb-4">
-          <h1 className="text-[18px] font-bold text-[#1d1d1f]">一眼看懂ROI</h1>
-          <p className="text-[12px] text-[#86868b]">{version === 'influencer' ? '达人推广场景' : '商家销售场景'}</p>
-        </div>
-
-        {/* Input Card */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-[#f0f0f0]">
-          {version === 'influencer' ? (
-            <div className="space-y-4">
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <label className="text-[12px] text-[#333] font-medium block mb-1.5 ml-1">商品价格 <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <input 
-                      type="number" 
-                      value={infPrice}
-                      onChange={(e) => setInfPrice(e.target.value)}
-                      className="w-full bg-[#f8f9fb] border-none rounded-xl px-4 py-3 text-[14px] font-bold outline-none ring-1 ring-transparent focus:ring-[#44a0fe]/30 transition-all"
-                    />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[12px] text-[#999]">元</span>
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <label className="text-[12px] text-[#333] font-medium block mb-1.5 ml-1">佣金率 <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <input 
-                      type="number" 
-                      value={infComm}
-                      onChange={(e) => setInfComm(e.target.value)}
-                      className="w-full bg-[#f8f9fb] border-none rounded-xl px-4 py-3 text-[14px] font-bold outline-none ring-1 ring-transparent focus:ring-[#44a0fe]/30 transition-all"
-                    />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[12px] text-[#999]">%</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="pt-2">
-                <div className="text-[11px] text-[#44a0fe] font-bold mb-3 flex items-center gap-1">
-                  <Info size={12} /> 高级选项 (可选)
-                </div>
-                <div className="flex gap-4">
-                  <div className="flex-1">
-                    <label className="text-[12px] text-[#666] block mb-1.5 ml-1">退货率</label>
-                    <div className="relative">
-                      <input 
-                        type="number" 
-                        value={infReturn}
-                        onChange={(e) => setInfReturn(e.target.value)}
-                        className="w-full bg-[#f8f9fb] border-none rounded-xl px-4 py-3 text-[14px] font-bold outline-none"
-                      />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[12px] text-[#999]">%</span>
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <label className="text-[12px] text-[#666] block mb-1.5 ml-1">提现费率</label>
-                    <div className="relative">
-                      <input 
-                        type="number" 
-                        value={infWithdraw}
-                        onChange={(e) => setInfWithdraw(e.target.value)}
-                        className="w-full bg-[#f8f9fb] border-none rounded-xl px-4 py-3 text-[14px] font-bold outline-none"
-                      />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[12px] text-[#999]">%</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-2">
-                <label className="text-[12px] text-[#666] block mb-1.5 ml-1">1h退款率</label>
-                <div className="relative">
-                  <input 
-                    type="number" 
-                    value={infRefund1h}
-                    onChange={(e) => setInfRefund1h(e.target.value)}
-                    className="w-full bg-[#f8f9fb] border-none rounded-xl px-4 py-3 text-[14px] font-bold outline-none"
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[12px] text-[#999]">%</span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-               <div className="flex gap-4">
-                <div className="flex-1">
-                  <label className="text-[12px] text-[#333] font-medium block mb-1.5 ml-1">商品售价 <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <input 
-                      type="number" 
-                      value={merPrice}
-                      onChange={(e) => setMerPrice(e.target.value)}
-                      className="w-full bg-[#f8f9fb] border-none rounded-xl px-4 py-3 text-[14px] font-bold outline-none ring-1 ring-transparent focus:ring-[#44a0fe]/30 transition-all"
-                    />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[12px] text-[#999]">元</span>
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <label className="text-[12px] text-[#333] font-medium block mb-1.5 ml-1">商品成本 <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <input 
-                      type="number" 
-                      value={merCost}
-                      onChange={(e) => setMerCost(e.target.value)}
-                      className="w-full bg-[#f8f9fb] border-none rounded-xl px-4 py-3 text-[14px] font-bold outline-none ring-1 ring-transparent focus:ring-[#44a0fe]/30 transition-all"
-                    />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[12px] text-[#999]">元</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-2">
-                <div className="text-[11px] text-[#44a0fe] font-bold mb-3 flex items-center gap-1">
-                  <Info size={12} /> 高级选项 (可选)
-                </div>
-                <div className="flex gap-4">
-                  <div className="flex-1">
-                    <label className="text-[12px] text-[#666] block mb-1.5 ml-1">退货率</label>
-                    <div className="relative">
-                      <input 
-                        type="number" 
-                        value={merReturn}
-                        onChange={(e) => setMerReturn(e.target.value)}
-                        className="w-full bg-[#f8f9fb] border-none rounded-xl px-4 py-3 text-[14px] font-bold outline-none"
-                      />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[12px] text-[#999]">%</span>
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <label className="text-[12px] text-[#666] block mb-1.5 ml-1">平台费率</label>
-                    <div className="relative">
-                      <input 
-                        type="number" 
-                        value={merPlatform}
-                        onChange={(e) => setMerPlatform(e.target.value)}
-                        className="w-full bg-[#f8f9fb] border-none rounded-xl px-4 py-3 text-[14px] font-bold outline-none"
-                      />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[12px] text-[#999]">%</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-2">
-                <label className="text-[12px] text-[#666] block mb-1.5 ml-1">1h退款率</label>
-                <div className="relative">
-                  <input 
-                    type="number" 
-                    value={merRefund1h}
-                    onChange={(e) => setMerRefund1h(e.target.value)}
-                    className="w-full bg-[#f8f9fb] border-none rounded-xl px-4 py-3 text-[14px] font-bold outline-none"
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[12px] text-[#999]">%</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <button 
-            onClick={version === 'influencer' ? calculateInfluencer : calculateMerchant}
-            className="w-full mt-6 bg-gradient-to-r from-[#5caaff] to-[#44a0fe] text-white py-3.5 rounded-2xl font-bold text-[16px] shadow-[0_8px_20px_rgba(68,160,254,0.3)] active:scale-[0.98] transition-all"
-          >
-            开始计算
+      <div className="flex-1 flex items-center justify-end gap-2 pr-4 relative">
+        <input 
+          type="number"
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full text-right bg-transparent outline-none text-[16px] text-gray-800 font-medium placeholder-gray-300"
+        />
+        {showClear && value && (
+          <button onClick={onClear} className="bg-gray-400 rounded-full p-0.5 text-white">
+            <X size={12} />
           </button>
-        </div>
-
-        {/* Results Area */}
-        {results && (
-          <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <span className="h-[1px] w-8 bg-gray-200"></span>
-              <span className="text-[13px] font-bold text-gray-400 uppercase tracking-widest leading-none">计算结果</span>
-              <span className="h-[1px] w-8 bg-gray-200"></span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mb-6">
-              <div className="bg-gradient-to-br from-[#6ebefd] to-[#44a0fe] p-4 rounded-2xl text-white shadow-lg shadow-blue-100 flex flex-col items-center justify-center">
-                <div className="text-[11px] font-medium opacity-80 mb-0.5">保本ROI</div>
-                <div className="text-[20px] font-black">{results.breakEvenROI}</div>
-              </div>
-              <div className="bg-white p-4 rounded-2xl border border-[#f0f0f0] shadow-sm flex flex-col items-center justify-center">
-                <div className="text-[11px] font-medium text-gray-400 mb-0.5">预估ROI</div>
-                <div className="text-[20px] font-black text-gray-800">{results.estimatedROI}</div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-2xl overflow-hidden border border-[#f0f0f0] shadow-sm">
-              <div className="divide-y divide-[#f9f9f9]">
-                {version === 'influencer' ? (
-                  <>
-                    <div className="flex justify-between items-center px-5 py-4">
-                      <span className="text-[13px] text-gray-500">毛利佣金</span>
-                      <span className="text-[14px] font-bold text-gray-800">¥{results.grossProfit}</span>
-                    </div>
-                    <div className="flex justify-between items-center px-5 py-4">
-                      <span className="text-[13px] text-gray-500">纯利佣金</span>
-                      <span className="text-[14px] font-bold text-gray-800">¥{results.netProfit}</span>
-                    </div>
-                    <div className="flex justify-between items-center px-5 py-4">
-                      <span className="text-[13px] text-gray-500 font-medium">净成交保本ROI</span>
-                      <span className="text-[14px] font-bold text-[#44a0fe]">{results.netROI}</span>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex justify-between items-center px-5 py-4">
-                      <span className="text-[13px] text-gray-500">毛利润</span>
-                      <span className="text-[14px] font-bold text-gray-800">¥{results.grossProfit}</span>
-                    </div>
-                    <div className="flex justify-between items-center px-5 py-4">
-                      <span className="text-[13px] text-gray-500">纯利润</span>
-                      <span className="text-[14px] font-bold text-gray-800">¥{results.netProfit}</span>
-                    </div>
-                    <div className="flex justify-between items-center px-5 py-4">
-                      <span className="text-[13px] text-gray-500">毛利润率</span>
-                      <span className="text-[14px] font-bold text-gray-800">{results.grossProfitRate}%</span>
-                    </div>
-                    <div className="flex justify-between items-center px-5 py-4">
-                      <span className="text-[13px] text-gray-500 font-medium">纯利润率</span>
-                      <span className="text-[14px] font-bold text-[#44a0fe]">{results.netProfitRate}%</span>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-4 bg-[#f0f8ff] border border-[#e1efff] px-4 py-2.5 rounded-xl flex items-center gap-2.5">
-              <div className="w-5 h-5 flex items-center justify-center bg-white rounded-full shadow-sm text-[12px]">💡</div>
-              <p className="text-[12px] text-[#44a0fe] font-medium">
-                投流ROI需达到 <span className="font-black text-[14px] mx-0.5">{results.breakEvenROI}</span> 才能保本
-              </p>
-            </div>
-          </div>
         )}
       </div>
+      <div className="text-[15px] text-gray-600 min-w-[24px] text-right">{unit}</div>
+    </div>
+  );
 
-      <div className="mt-10 px-6 text-center">
+  return (
+    <div className="min-h-screen bg-[#f5f6f8] font-sans pb-28">
+      {/* Tabs */}
+      <div className="sticky top-0 z-30 bg-white p-1 shadow-sm flex">
         <button 
-          onClick={() => setResults(null)}
-          className="inline-flex items-center gap-1.5 text-[12px] text-gray-300 hover:text-[#44a0fe] transition-colors"
+          onClick={() => setTab('single')}
+          className={`flex-1 py-3 text-[16px] font-bold rounded-lg transition-all ${tab === 'single' ? 'bg-[#7d7cf2] text-white' : 'text-gray-800'}`}
         >
-          <RotateCcw size={14} /> 重置所有数据
+          单SKU计算
+        </button>
+        <button 
+          onClick={() => setTab('multi')}
+          className={`flex-1 py-3 text-[16px] font-bold rounded-lg transition-all ${tab === 'multi' ? 'bg-[#7d7cf2] text-white' : 'text-gray-800'}`}
+        >
+          多SKU计算
+        </button>
+      </div>
+
+      <div className="mt-2">
+        {tab === 'single' ? (
+          <>
+            <InputRow label="销售价格" value={price} onChange={setPrice} unit="元" />
+            <InputRow label="产品成本" value={cost} onChange={setCost} unit="元" />
+          </>
+        ) : (
+          <div className="bg-white px-4 py-2 space-y-4">
+            {skuList.map((sku, index) => (
+              <div key={sku.id} className="p-4 bg-gray-50 rounded-2xl relative border border-gray-100">
+                <div className="flex items-center justify-between mb-3 text-xs font-bold text-gray-400">
+                  <span>SKU {index + 1}</span>
+                  {skuList.length > 1 && (
+                    <button onClick={() => removeSku(sku.id)} className="text-red-400 flex items-center gap-1">
+                      <Trash2 size={12} /> 删除
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">价格 (元)</label>
+                    <input 
+                      type="number"
+                      value={sku.price}
+                      onChange={(e) => updateSku(sku.id, 'price', e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-[#7d7cf2]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">成本 (元)</label>
+                    <input 
+                      type="number"
+                      value={sku.cost}
+                      onChange={(e) => updateSku(sku.id, 'cost', e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-[#7d7cf2]"
+                    />
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <label className="text-xs text-gray-400 mb-1 block">销售占比 (权重)</label>
+                  <input 
+                    type="number"
+                    value={sku.ratio}
+                    onChange={(e) => updateSku(sku.id, 'ratio', e.target.value)}
+                    className="w-full bg-white border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-[#7d7cf2]"
+                  />
+                </div>
+              </div>
+            ))}
+            <button 
+              onClick={addSku}
+              className="w-full py-2 border-2 border-dashed border-gray-200 rounded-xl text-gray-400 text-sm font-medium flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors"
+            >
+              <Plus size={16} /> 添加 SKU
+            </button>
+          </div>
+        )}
+
+        <div className="mt-2">
+          <InputRow label="平台扣点" value={platformPoint} onChange={setPlatformPoint} unit="%" />
+          <InputRow label="运费" value={shipFee} onChange={setShipFee} unit="元" showClear onClear={() => setShipFee("")} />
+          <InputRow label="赠品成本" value={giftCost} onChange={setGiftCost} unit="元" />
+          <InputRow label="其他成本" value={otherCost} onChange={setOtherCost} unit="元" />
+          <InputRow label="前退款率" value={refundBefore} onChange={setRefundBefore} unit="%" placeholder="发货前" />
+          <InputRow label="后退款率" value={refundAfter} onChange={setRefundAfter} unit="%" placeholder="发货后" />
+        </div>
+      </div>
+
+      {/* Result Area 1 */}
+      <div className="bg-[#f2f6ff] px-6 py-5 flex flex-wrap justify-between items-center text-[#7d7cf2] gap-y-1">
+        <div className="w-1/2">
+          <p className="text-[15px] font-medium">保本投产ROI: <span className="font-bold">{roiResult?.breakEvenROI || '--'}</span></p>
+          <p className="text-[15px] font-medium">保本成交额: <span className="font-bold">{roiResult?.breakEvenBid || '--'}</span></p>
+        </div>
+        <div className="w-1/2 text-right">
+          <p className="text-[15px] font-medium">综合利润率: <span className="font-bold">{roiResult?.profitRate || '--'}</span></p>
+        </div>
+      </div>
+
+      <div className="px-3 mt-4">
+        <button 
+          onClick={handleCalculateROI}
+          className="w-full py-4 bg-[#7d7cf2] text-white font-bold text-[18px] rounded-xl shadow-lg active:scale-[0.98] transition-all"
+        >
+          计算 ROI
+        </button>
+      </div>
+
+      <div className="mt-10 border-t border-gray-100 bg-white">
+        <div className="px-4 py-3 bg-gray-50 text-[13px] font-bold text-gray-400 tracking-wider">推广盈亏分析</div>
+        <InputRow label="实际花费" value={actualSpend} onChange={setActualSpend} unit="元" />
+        <InputRow label="实际投产ROI" value={actualROI} onChange={setActualROI} unit="" />
+        <InputRow label="补充费用" value={extraFees} onChange={setExtraFees} unit="元" />
+      </div>
+
+      {/* Result Area 2 */}
+      <div className={`bg-[#f2f6ff] px-6 py-5 transition-all ${promoProfit ? 'opacity-100 translate-y-0' : 'opacity-50'}`}>
+        <p className="text-[17px] font-bold text-[#7d7cf2]">推广预测盈亏: <span className="text-[20px]">{promoProfit || '--'}</span> <span className="text-sm font-normal">元</span></p>
+      </div>
+
+      <div className="px-3 mt-4">
+        <button 
+          onClick={handleCalculatePromoProfit}
+          className="w-full py-4 bg-[#7d7cf2] text-white font-bold text-[18px] rounded-xl shadow-lg active:scale-[0.98] transition-all"
+        >
+          计算推广盈亏
+        </button>
+      </div>
+
+      <div className="mt-10 mb-10 flex flex-col items-center gap-4 text-gray-300">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-[1px] bg-gray-200"></div>
+          <span className="text-[10px] uppercase tracking-widest font-bold">新塘档口计算器</span>
+          <div className="w-8 h-[1px] bg-gray-200"></div>
+        </div>
+        <button 
+          onClick={() => {
+            setPrice(""); setCost(""); setPlatformPoint(""); setShipFee(""); setGiftCost(""); setOtherCost("");
+            setRefundBefore(""); setRefundAfter(""); setActualSpend(""); setActualROI(""); setExtraFees("");
+            setRoiResult(null); setPromoProfit(null);
+            setSkuList([{ id: Date.now(), price: "", cost: "", ratio: "1" }]);
+          }}
+          className="text-xs font-medium text-gray-400 hover:text-[#7d7cf2] transition-colors"
+        >
+          清空所有数据
         </button>
       </div>
     </div>
