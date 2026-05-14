@@ -437,7 +437,9 @@ async function startServer() {
       host,
       port: Number(port),
       secure: Number(port) === 465,
+      requireTLS: Number(port) !== 465, // Explicitly require TLS for non-465 ports
       auth: { user, pass },
+      connectionTimeout: 10000, // 10 seconds timeout
     });
 
     try {
@@ -448,9 +450,12 @@ async function startServer() {
         text: "这是一封测试邮件，表示SMTP设置正确。",
       });
       res.json({ success: true });
-    } catch (e) {
+    } catch (e: any) {
       console.error("Test email failed:", e);
-      res.status(500).json({ error: e instanceof Error ? e.message : "连接测试失败" });
+      // Return detailed error info
+      const errorMsg = e.message || "连接测试失败";
+      const detail = e.code ? ` (错误码: ${e.code})` : "";
+      res.status(500).json({ error: `${errorMsg}${detail}` });
     }
   });
 
