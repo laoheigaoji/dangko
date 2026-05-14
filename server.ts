@@ -170,8 +170,14 @@ async function startServer() {
     res.json(item);
   });
   app.post("/api/turnover", async (req, res) => {
-    const item = new TurnoverItem({ ...req.body, status: 'pending' });
+    const setting = await Settings.findOne({ key: "auto_approve" });
+    const isAuto = setting?.value?.enabled;
+    const status = isAuto ? 'approved' : 'pending';
+    const item = new TurnoverItem({ ...req.body, status });
     await item.save();
+    if (status === 'approved') {
+      notifySubscribers(item.shopName, 'turnover', item);
+    }
     res.status(201).json(item);
   });
   app.delete("/api/turnover/:id", async (req, res) => {
@@ -204,8 +210,14 @@ async function startServer() {
     res.json(item);
   });
   app.post("/api/buy", async (req, res) => {
-    const item = new BuyItem({ ...req.body, status: 'pending' });
+    const setting = await Settings.findOne({ key: "auto_approve" });
+    const isAuto = setting?.value?.enabled;
+    const status = isAuto ? 'approved' : 'pending';
+    const item = new BuyItem({ ...req.body, status });
     await item.save();
+    if (status === 'approved') {
+      notifySubscribers(item.shopName, 'buy', item);
+    }
     res.status(201).json(item);
   });
   app.delete("/api/buy/:id", async (req, res) => {
@@ -416,6 +428,32 @@ async function startServer() {
     res.json({ success: true });
   });
 
+  app.post("/api/settings/smtp/test", async (req, res) => {
+    const smtpSetting = await Settings.findOne({ key: "smtp" });
+    if (!smtpSetting) return res.status(400).json({ error: "SMTP not configured" });
+
+    const { host, port, user, pass, from } = smtpSetting.value;
+    const transporter = nodemailer.createTransport({
+      host,
+      port: Number(port),
+      secure: Number(port) === 465,
+      auth: { user, pass },
+    });
+
+    try {
+      await transporter.sendMail({
+        from,
+        to: user, // Send test email to the configured user address
+        subject: "测试邮件 - 新塘档口平台",
+        text: "这是一封测试邮件，表示SMTP设置正确。",
+      });
+      res.json({ success: true });
+    } catch (e) {
+      console.error("Test email failed:", e);
+      res.status(500).json({ error: e instanceof Error ? e.message : "连接测试失败" });
+    }
+  });
+
   app.get("/api/settings/smtp", async (req, res) => {
     const smtp = await Settings.findOne({ key: "smtp" });
     res.json(smtp ? smtp.value : null);
@@ -474,6 +512,15 @@ async function startServer() {
       );
       console.log("Default VIP Plans configured");
     }
+    const autoApproveExisting = await Settings.findOne({ key: "auto_approve" });
+    if (!autoApproveExisting) {
+      await Settings.findOneAndUpdate(
+        { key: "auto_approve" },
+        { value: { enabled: false } },
+        { upsert: true }
+      );
+      console.log("Default auto_approve configured");
+    }
     const alipayExisting = await Settings.findOne({ key: "alipay" });
     if (!alipayExisting) {
       await Settings.findOneAndUpdate(
@@ -503,6 +550,21 @@ async function startServer() {
     await Settings.findOneAndUpdate(
       { key: "alipay" },
       { value: { appId, privateKey, alipayPublicKey, sandbox } },
+      { upsert: true }
+    );
+    res.json({ success: true });
+  });
+
+  app.get("/api/settings/auto-approve", async (req, res) => {
+    const setting = await Settings.findOne({ key: "auto_approve" });
+    res.json(setting ? setting.value : { enabled: false });
+  });
+
+  app.post("/api/settings/auto-approve", async (req, res) => {
+    const { enabled } = req.body;
+    await Settings.findOneAndUpdate(
+      { key: "auto_approve" },
+      { value: { enabled } },
       { upsert: true }
     );
     res.json({ success: true });

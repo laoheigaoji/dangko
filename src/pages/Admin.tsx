@@ -19,6 +19,26 @@ export default function Admin() {
   const [notice, setNotice] = useState({ enabled: true, title: '', content: '', date: '' });
   const [vipPlans, setVipPlans] = useState<any[]>([]);
   const [alipay, setAlipay] = useState({ appId: '', privateKey: '', alipayPublicKey: '', sandbox: true });
+  const [autoApprove, setAutoApprove] = useState({ enabled: false });
+
+  const fetchAutoApprove = async () => {
+    const res = await fetch('/api/settings/auto-approve');
+    const data = await res.json();
+    if (data) setAutoApprove(data);
+  };
+
+  const saveAutoApprove = async () => {
+    try {
+      await fetch('/api/settings/auto-approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(autoApprove)
+      });
+      alert('免审配置已保存');
+    } catch (e) {
+      alert('保存失败');
+    }
+  };
 
   const fetchAlipay = async () => {
     const res = await fetch('/api/settings/alipay');
@@ -86,6 +106,20 @@ export default function Admin() {
     if (data) setSmtp(data);
   };
 
+  const testSmtp = async () => {
+    try {
+      const res = await fetch('/api/settings/smtp/test', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        alert('测试邮件发送成功！');
+      } else {
+        alert('测试失败: ' + data.error);
+      }
+    } catch (e) {
+      alert('请求失败');
+    }
+  };
+ 
   const saveSmtp = async () => {
     try {
       await fetch('/api/settings/smtp', {
@@ -141,6 +175,7 @@ export default function Admin() {
       fetchNotice();
       fetchVipPlans();
       fetchAlipay();
+      fetchAutoApprove();
     } catch (e) {
       console.error("Auth verify failed:", e);
       localStorage.removeItem("adminUser");
@@ -642,6 +677,28 @@ export default function Admin() {
 
             <div className="bg-white p-6 rounded-lg shadow-sm space-y-4">
               <h2 className="text-lg font-bold text-gray-800 border-b pb-2 flex items-center gap-2">
+                <Shield size={18} className="text-blue-500" />
+                信息发布免审设置
+              </h2>
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <span className="text-sm font-medium text-gray-700">开启发布免审</span>
+                <button 
+                  onClick={() => setAutoApprove({...autoApprove, enabled: !autoApprove.enabled})}
+                  className={`w-12 h-6 rounded-full transition-colors relative ${autoApprove.enabled ? 'bg-green-500' : 'bg-gray-300'}`}
+                >
+                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${autoApprove.enabled ? 'left-7' : 'left-1'}`}></div>
+                </button>
+              </div>
+              <button 
+                onClick={saveAutoApprove}
+                className="w-full bg-blue-500 text-white font-bold py-3 rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                保存免审配置
+              </button>
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow-sm space-y-4">
+              <h2 className="text-lg font-bold text-gray-800 border-b pb-2 flex items-center gap-2">
                 <Calculator size={18} className="text-[#7d7cf2]" />
                 VIP 会员价格设置
               </h2>
@@ -822,12 +879,20 @@ export default function Admin() {
                   />
                 </div>
               </div>
-              <button 
-                onClick={saveSmtp}
-                className="w-full bg-gray-800 text-white font-bold py-3 rounded-lg hover:bg-black transition-colors"
-              >
-                保存邮件配置
-              </button>
+              <div className="flex gap-2">
+                <button 
+                  onClick={testSmtp}
+                  className="flex-1 bg-gray-200 text-gray-800 font-bold py-3 rounded-lg hover:bg-gray-300 transition-colors"
+                >
+                  测试邮件配置
+                </button>
+                <button 
+                  onClick={saveSmtp}
+                  className="flex-1 bg-gray-800 text-white font-bold py-3 rounded-lg hover:bg-black transition-colors"
+                >
+                  保存邮件配置
+                </button>
+              </div>
             </div>
           </div>
         )}
