@@ -125,6 +125,7 @@ async function startServer() {
       port: Number(port),
       secure: Number(port) === 465,
       auth: { user, pass },
+      family: 4,
     });
 
     for (const u of users) {
@@ -440,6 +441,7 @@ async function startServer() {
       requireTLS: Number(port) !== 465, // Explicitly require TLS for non-465 ports
       auth: { user, pass },
       connectionTimeout: 10000, // 10 seconds timeout
+      family: 4,
     });
 
     try {
@@ -779,6 +781,7 @@ async function startServer() {
       port: Number(port),
       secure: Number(port) === 465,
       auth: { user, pass },
+      family: 4,
     });
 
     try {

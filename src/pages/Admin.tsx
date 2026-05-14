@@ -116,7 +116,7 @@ export default function Admin() {
         alert('测试失败: ' + data.error);
       }
     } catch (e) {
-      alert('请求失败');
+      alert('请求失败: ' + (e instanceof Error ? e.message : String(e)));
     }
   };
  
