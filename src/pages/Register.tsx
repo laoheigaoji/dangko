@@ -97,12 +97,12 @@ export default function Register() {
               placeholder="邮箱验证码"
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              className="flex-1 border border-[#f0f0f0] rounded-[6px] py-2.5 px-3 text-[14px] outline-none focus:border-[#528add] transition-colors placeholder:text-[#ccc] text-[#333]"
+              className="flex-1 min-w-0 border border-[#f0f0f0] rounded-[6px] py-2.5 px-3 text-[14px] outline-none focus:border-[#528add] transition-colors placeholder:text-[#ccc] text-[#333]"
             />
             <button 
               onClick={sendCode}
               disabled={sending || countdown > 0}
-              className="px-3 bg-gray-100 text-gray-600 rounded-[6px] text-xs font-medium disabled:opacity-50 min-w-[100px]"
+              className="px-2 bg-gray-100 text-gray-600 rounded-[6px] text-[11px] font-medium disabled:opacity-50 whitespace-nowrap flex-shrink-0"
             >
               {countdown > 0 ? `${countdown}s后重发` : (sending ? "发送中..." : "获取验证码")}
             </button>
