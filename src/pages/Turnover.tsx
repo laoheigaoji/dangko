@@ -12,6 +12,7 @@ export default function Turnover() {
   const navigate = useNavigate();
   const location = useLocation();
   const [showPublishWarning, setShowPublishWarning] = useState(false);
+  const [showCompleteProfileModal, setShowCompleteProfileModal] = useState(false);
   const [notice, setNotice] = useState<any>(null);
   const [showNotice, setShowNotice] = useState(false);
   
@@ -48,8 +49,8 @@ export default function Turnover() {
 
   useEffect(() => {
     if (location.state?.showProfileReminder) {
-      setShowPublishWarning(true);
-      window.history.replaceState({}, document.title);
+      setShowCompleteProfileModal(true);
+      window.history.replaceState({ ...window.history.state, state: { ...window.history.state?.state, showProfileReminder: undefined } }, document.title);
     }
   }, [location]);
 
@@ -247,23 +248,44 @@ export default function Turnover() {
       </button>
 
       {showPublishWarning && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[100] pb-10 px-4">
-          <div className="bg-white w-[300px] rounded-[24px] p-6 text-center flex flex-col items-center shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            <svg width="54" height="54" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mb-2">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] pb-10 px-4">
+          <div className="bg-white/50 backdrop-blur-xl w-[300px] rounded-[24px] p-4 text-center flex flex-col items-center shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mb-2">
               <path d="M11.134 3.447c.4-.7 1.332-.7 1.732 0l8.28 14.34c.4-.7-.098 1.583-.902 1.583H3.756c-.804 0-1.302-.883-.902-1.583l8.28-14.34z" fill="#fbbd23"/>
               <path d="M12 8v5" stroke="#333" strokeLinecap="round" strokeWidth="2.5"/>
               <circle cx="12" cy="16.5" r="1.5" fill="#333"/>
             </svg>
-            <div className="text-[17px] font-bold text-[#333] mb-2 tracking-wide">无法发布</div>
-            <div className="text-[14px] text-[#666] mb-6 leading-relaxed">
+            <div className="text-[17px] font-bold text-[#333] mb-1 tracking-wide">无法发布</div>
+            <div className="text-[14px] text-[#666] mb-4 leading-relaxed">
               您当前没有发布权限，<br/>
               请联系管理员<span className="text-[#4b8cd9] font-medium">开通会员权限</span>
             </div>
             <button 
               onClick={() => setShowPublishWarning(false)}
-              className="w-full py-3 rounded-[12px] bg-gradient-to-r from-[#4b8cd9] to-[#67c34b] text-white font-bold text-[15px] shadow-[0_4px_12px_rgba(75,140,217,0.3)] active:scale-[0.98] transition-transform"
+              className="w-full py-2.5 rounded-[12px] bg-gradient-to-r from-[#4b8cd9] to-[#67c34b] text-white font-bold text-[15px] shadow-[0_4px_12px_rgba(75,140,217,0.3)] active:scale-[0.98] transition-transform"
             >
               我知道了
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showCompleteProfileModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] pb-10 px-4">
+          <div className="bg-white/50 backdrop-blur-xl w-[300px] rounded-[24px] p-4 text-center flex flex-col items-center shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-[48px] h-[48px] rounded-full bg-blue-100 flex items-center justify-center mb-1">
+              <span className="text-2xl">👤</span>
+            </div>
+            <div className="text-[17px] font-bold text-[#333] mb-1 tracking-wide">完善资料</div>
+            <div className="text-[14px] text-[#666] mb-4 leading-relaxed">
+              请先在个人资料中<br/>
+              添写至少一种联系方式（微信/QQ）
+            </div>
+            <button 
+              onClick={() => { setShowCompleteProfileModal(false); navigate('/profile/edit'); }}
+              className="w-full py-2.5 rounded-[12px] bg-gradient-to-r from-[#4b8cd9] to-[#67c34b] text-white font-bold text-[15px] shadow-[0_4px_12px_rgba(75,140,217,0.3)] active:scale-[0.98] transition-transform"
+            >
+              去完善资料
             </button>
           </div>
         </div>
