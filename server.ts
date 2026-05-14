@@ -121,7 +121,7 @@ async function startServer() {
 
     const { host, port, user, pass, from } = smtpSetting.value;
     const transporter = nodemailer.createTransport({
-      host,
+      host: '163.177.90.189',
       port: Number(port),
       secure: Number(port) === 465,
       auth: { user, pass },
@@ -435,7 +435,7 @@ async function startServer() {
 
     const { host, port, user, pass, from } = smtpSetting.value;
     const transporter = nodemailer.createTransport({
-      host,
+      host: '163.177.90.189',
       port: Number(port),
       secure: Number(port) === 465,
       requireTLS: Number(port) !== 465, // Explicitly require TLS for non-465 ports
@@ -777,7 +777,7 @@ async function startServer() {
 
     const { host, port, user, pass, from } = smtpSetting.value;
     const transporter = nodemailer.createTransport({
-      host,
+      host: '163.177.90.189',
       port: Number(port),
       secure: Number(port) === 465,
       auth: { user, pass },

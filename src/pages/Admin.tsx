@@ -109,11 +109,17 @@ export default function Admin() {
   const testSmtp = async () => {
     try {
       const res = await fetch('/api/settings/smtp/test', { method: 'POST' });
-      const data = await res.json();
-      if (res.ok) {
-        alert('测试邮件发送成功！');
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.indexOf("application/json") !== -1) {
+        const data = await res.json();
+        if (res.ok) {
+          alert('测试邮件发送成功！');
+        } else {
+          alert('测试失败: ' + data.error);
+        }
       } else {
-        alert('测试失败: ' + data.error);
+        const text = await res.text();
+        alert('测试失败: 服务器返回非JSON格式内容: ' + text.substring(0, 50));
       }
     } catch (e) {
       alert('请求失败: ' + (e instanceof Error ? e.message : String(e)));
