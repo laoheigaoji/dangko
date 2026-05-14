@@ -15,10 +15,32 @@ const User = _User as any;
 const Settings = _Settings as any;
 const Order = _Order as any;
 
-import nodemailer from "nodemailer";
+import emailjs from '@emailjs/nodejs';
 import { AlipaySdk } from "alipay-sdk";
 
 dotenv.config();
+
+let emailJsInitialized = false;
+
+async function getEmailJsConfig() {
+    const smtpSetting = await Settings.findOne({ key: "smtp" });
+    if (!smtpSetting?.value?.emailJsServiceId || !smtpSetting?.value?.emailJsTemplateId || !smtpSetting?.value?.emailJsPublicKey || !smtpSetting?.value?.emailJsPrivateKey) {
+      throw new Error("EmailJS is not fully configured. Please check Admin settings.");
+    }
+
+    if (!emailJsInitialized) {
+      emailjs.init({
+        publicKey: smtpSetting.value.emailJsPublicKey,
+        privateKey: smtpSetting.value.emailJsPrivateKey,
+      });
+      emailJsInitialized = true;
+    }
+    
+    return {
+      serviceId: smtpSetting.value.emailJsServiceId,
+      templateId: smtpSetting.value.emailJsTemplateId,
+    };
+}
 
 async function startServer() {
   const app = express();
@@ -119,15 +141,8 @@ async function startServer() {
       ]
     });
 
-    const { host, port, user, pass, from } = smtpSetting.value;
-    const transporter = nodemailer.createTransport({
-      host: '163.177.90.189',
-      port: Number(port),
-      secure: Number(port) === 465,
-      auth: { user, pass },
-      family: 4,
-    });
-
+    const { from } = smtpSetting.value;
+    
     for (const u of users) {
       if (!u.email) continue;
       
@@ -139,7 +154,13 @@ async function startServer() {
       const text = `档口: ${shopName}\n类型: ${type === 'turnover' ? '转让' : '求购'}\n发布者: ${data.userName}\n金额/价格: ${type === 'turnover' ? data.transferPrice : data.requestAmount}\n详情请见平台。`;
 
       try {
-        await transporter.sendMail({ from, to: u.email, subject, text });
+        const { serviceId, templateId } = await getEmailJsConfig();
+        await emailjs.send(serviceId, templateId, {
+          to_email: u.email,
+          user_email: u.email,
+          subject,
+          message: text,
+        });
       } catch (err) {
         console.error(`Failed to notify ${u.email}`, err);
       }
@@ -433,31 +454,20 @@ async function startServer() {
     const smtpSetting = await Settings.findOne({ key: "smtp" });
     if (!smtpSetting) return res.status(400).json({ error: "SMTP not configured" });
 
-    const { host, port, user, pass, from } = smtpSetting.value;
-    const transporter = nodemailer.createTransport({
-      host: '163.177.90.189',
-      port: Number(port),
-      secure: Number(port) === 465,
-      requireTLS: Number(port) !== 465, // Explicitly require TLS for non-465 ports
-      auth: { user, pass },
-      connectionTimeout: 10000, // 10 seconds timeout
-      family: 4,
-    });
-
+    const { from, user: toEmail } = smtpSetting.value;
+    
     try {
-      await transporter.sendMail({
-        from,
-        to: user, // Send test email to the configured user address
+      const { serviceId, templateId } = await getEmailJsConfig();
+      await emailjs.send(serviceId, templateId, {
+        to_email: toEmail,
+        user_email: toEmail,
         subject: "测试邮件 - 新塘档口平台",
-        text: "这是一封测试邮件，表示SMTP设置正确。",
+        message: "这是一封测试邮件，表示SMTP设置正确。",
       });
       res.json({ success: true });
     } catch (e: any) {
       console.error("Test email failed:", e);
-      // Return detailed error info
-      const errorMsg = e.message || "连接测试失败";
-      const detail = e.code ? ` (错误码: ${e.code})` : "";
-      res.status(500).json({ error: `${errorMsg}${detail}` });
+      res.status(500).json({ error: e.message || "连接测试失败" });
     }
   });
 
@@ -753,10 +763,10 @@ async function startServer() {
   });
 
   app.post("/api/settings/smtp", async (req, res) => {
-    const { host, port, user, pass, from } = req.body;
+    const { host, port, user, pass, from, emailJsServiceId, emailJsTemplateId, emailJsPublicKey, emailJsPrivateKey } = req.body;
     await Settings.findOneAndUpdate(
       { key: "smtp" },
-      { value: { host, port, user, pass, from } },
+      { value: { host, port, user, pass, from, emailJsServiceId, emailJsTemplateId, emailJsPublicKey, emailJsPrivateKey } },
       { upsert: true }
     );
     res.json({ success: true });
@@ -775,24 +785,19 @@ async function startServer() {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     verificationCodes.set(email, code);
 
-    const { host, port, user, pass, from } = smtpSetting.value;
-    const transporter = nodemailer.createTransport({
-      host: '163.177.90.189',
-      port: Number(port),
-      secure: Number(port) === 465,
-      auth: { user, pass },
-      family: 4,
-    });
-
+    const { from } = smtpSetting.value;
+    
     try {
-      await transporter.sendMail({
-        from,
-        to: email,
-        subject: "验证码 - 新塘档口平台",
-        text: `您的验证码是: ${code}。有效时间5分钟。`,
+      const { serviceId, templateId } = await getEmailJsConfig();
+      const expirationTime = 15;
+      const timeStr = new Date(Date.now() + expirationTime * 60000).toLocaleTimeString();
+      
+      await emailjs.send(serviceId, templateId, {
+        to_email: email,
+        code: code,
       });
       res.json({ success: true });
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
       res.status(500).json({ error: "邮件发送失败" });
     }

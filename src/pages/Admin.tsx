@@ -884,6 +884,46 @@ export default function Admin() {
                     placeholder="platform@example.com"
                   />
                 </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs text-gray-500 mb-1">EmailJS Service ID</label>
+                  <input 
+                    type="text" 
+                    value={smtp.emailJsServiceId || ''} 
+                    onChange={e => setSmtp({...smtp, emailJsServiceId: e.target.value})}
+                    className="w-full border rounded px-3 py-2 text-sm outline-none focus:border-gray-800"
+                    placeholder="service_..."
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs text-gray-500 mb-1">EmailJS Template ID</label>
+                  <input 
+                    type="text" 
+                    value={smtp.emailJsTemplateId || ''} 
+                    onChange={e => setSmtp({...smtp, emailJsTemplateId: e.target.value})}
+                    className="w-full border rounded px-3 py-2 text-sm outline-none focus:border-gray-800"
+                    placeholder="template_..."
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs text-gray-500 mb-1">EmailJS Public Key</label>
+                  <input 
+                    type="password" 
+                    value={smtp.emailJsPublicKey || ''} 
+                    onChange={e => setSmtp({...smtp, emailJsPublicKey: e.target.value})}
+                    className="w-full border rounded px-3 py-2 text-sm outline-none focus:border-gray-800"
+                    placeholder="pk_..."
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-xs text-gray-500 mb-1">EmailJS Private Key</label>
+                  <input 
+                    type="password" 
+                    value={smtp.emailJsPrivateKey || ''} 
+                    onChange={e => setSmtp({...smtp, emailJsPrivateKey: e.target.value})}
+                    className="w-full border rounded px-3 py-2 text-sm outline-none focus:border-gray-800"
+                    placeholder="sk_..."
+                  />
+                </div>
               </div>
               <div className="flex gap-2">
                 <button 
