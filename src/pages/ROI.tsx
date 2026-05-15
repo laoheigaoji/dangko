@@ -15,6 +15,36 @@ type SKUItem = {
   ratio: string; // Weight or estimated sales ratio
 };
 
+function InputRow({ 
+  label, value, onChange, unit, showClear = false, placeholder = "", onClear 
+}: { 
+  label: string; value: string; onChange: (v: string) => void; unit: string; showClear?: boolean; placeholder?: string; onClear?: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between py-4 px-4 border-b border-gray-100 bg-white">
+      <div className="flex items-center gap-1 min-w-[100px]">
+        <span className="text-red-500 text-lg leading-none mt-1">*</span>
+        <span className="text-[15px] text-gray-700 font-medium">{label}</span>
+      </div>
+      <div className="flex-1 flex items-center justify-end gap-2 pr-4 relative">
+        <input 
+          type="number"
+          value={value}
+          placeholder={placeholder || `请输入${label}`}
+          onChange={(e) => {
+            onChange(e.target.value);
+          }}
+          className="w-full text-right bg-transparent outline-none text-[16px] text-gray-800 font-medium placeholder-gray-300"
+        />
+        {showClear && value && (
+          <button onClick={onClear} className="bg-gray-400 rounded-full p-0.5 text-white"><X size={12} /></button>
+        )}
+      </div>
+      <div className="text-[15px] text-gray-600 min-w-[24px] text-right">{unit}</div>
+    </div>
+  );
+}
+
 export default function ROI() {
   const [hasRoi, setHasRoi] = useState(false);
   const [vipPlans, setVipPlans] = useState<any[]>([]);
@@ -432,32 +462,6 @@ export default function ROI() {
     setPromoProfit(profit.toFixed(2));
   };
 
-  const InputRow = ({ 
-    label, value, onChange, unit, showClear = false, placeholder = "", onClear 
-  }: { 
-    label: string; value: string; onChange: (v: string) => void; unit: string; showClear?: boolean; placeholder?: string; onClear?: () => void;
-  }) => (
-    <div className="flex items-center justify-between py-4 px-4 border-b border-gray-100 bg-white">
-      <div className="flex items-center gap-1 min-w-[100px]">
-        <span className="text-red-500 text-lg leading-none mt-1">*</span>
-        <span className="text-[15px] text-gray-700 font-medium">{label}</span>
-      </div>
-      <div className="flex-1 flex items-center justify-end gap-2 pr-4 relative">
-        <input 
-          type="number"
-          value={value}
-          placeholder={placeholder || `请输入${label}`}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full text-right bg-transparent outline-none text-[16px] text-gray-800 font-medium placeholder-gray-300"
-        />
-        {showClear && value && (
-          <button onClick={onClear} className="bg-gray-400 rounded-full p-0.5 text-white"><X size={12} /></button>
-        )}
-      </div>
-      <div className="text-[15px] text-gray-600 min-w-[24px] text-right">{unit}</div>
-    </div>
-  );
-
   return (
     <div className="min-h-screen bg-[#f5f6f8] font-sans pb-28">
       {/* Top Mode Selector */}
@@ -595,4 +599,3 @@ export default function ROI() {
     </div>
   );
 }
-

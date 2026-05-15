@@ -304,6 +304,11 @@ async function startServer() {
     res.json(users);
   });
 
+  app.delete("/api/users/:id", async (req, res) => {
+    await User.findByIdAndDelete(req.params.id);
+    res.json({ success: true });
+  });
+
   app.put("/api/users/:id", async (req, res) => {
     const { phone, isVip, email, wx, qq, favorites, subscriptions } = req.body;
     const updateData: any = {};
@@ -325,6 +330,12 @@ async function startServer() {
     res.json(user);
   });
 
+  app.put("/api/users/:id/permissions", async (req, res) => {
+    const { hasPublish, hasRoi } = req.body;
+    const user = await User.findByIdAndUpdate(req.params.id, { hasPublish, hasRoi }, { new: true });
+    res.json(user);
+  });
+  
   app.put("/api/users/:id/password", async (req, res) => {
     const { password } = req.body;
     const user = await User.findByIdAndUpdate(req.params.id, { password }, { new: true });

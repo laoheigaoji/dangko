@@ -14,6 +14,9 @@ export default function Admin() {
   const [editingPasswordId, setEditingPasswordId] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [showPermissionsModal, setShowPermissionsModal] = useState(false);
+  const [permissions, setPermissions] = useState({ hasPublish: false, hasRoi: false });
 
   const [smtp, setSmtp] = useState({ host: '', port: '', user: '', pass: '', from: '' });
   const [notice, setNotice] = useState({ enabled: true, title: '', content: '', date: '' });
@@ -207,6 +210,17 @@ export default function Admin() {
     }
   };
 
+  const deleteUser = async (id: string, phone: string) => {
+    if (!confirm(`确定要删除用户 ${phone} 吗？`)) return;
+    try {
+      await fetch(`/api/users/${id}`, { method: 'DELETE' });
+      fetchData();
+    } catch (e) {
+      console.error(e);
+      alert('删除失败');
+    }
+  };
+ 
   const toggleVip = async (id: string, currentVip: boolean) => {
     try {
       const res = await fetch(`/api/users/${id}/vip`, {
@@ -408,10 +422,23 @@ export default function Admin() {
                       修改密码
                     </button>
                     <button
-                      onClick={() => toggleVip(user._id, user.isVip)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1 ${user.isVip ? 'bg-[#ffeedb] text-[#f59e0b]' : 'bg-gray-100 text-gray-500'}`}
+                      onClick={() => { 
+                        setSelectedUser(user); 
+                        setShowPermissionsModal(true); 
+                        setPermissions({ hasPublish: !!user.hasPublish, hasRoi: !!user.hasRoi });
+                      }}
+                      className="px-3 py-1.5 rounded-full text-xs font-medium bg-purple-50 text-purple-600 border border-purple-200 flex items-center gap-1"
                     >
-                      <Shield size={14} /> {user.isVip ? '已开通VIP' : '开通VIP'}
+                      <Shield size={14} /> 权限
+                    </button>
+                    <button
+                      onClick={() => {
+                        console.log('Delete button clicked for:', user._id);
+                        deleteUser(user._id, user.phone);
+                      }}
+                      className="px-3 py-1.5 rounded-full text-xs font-medium bg-red-50 text-red-500 border border-red-200 flex items-center gap-1 relative z-20"
+                    >
+                      <Trash2 size={14} /> 删除
                     </button>
                   </div>
                 </div>
@@ -622,6 +649,41 @@ export default function Admin() {
                     关闭详情
                   </button>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showPermissionsModal && (
+          <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl p-6">
+              <h2 className="text-lg font-bold mb-4">修改权限 - {selectedUser?.phone}</h2>
+              <div className="space-y-4">
+                <label className="flex items-center justify-between p-3 border rounded-lg">
+                  <span>开通发布权限</span>
+                  <input type="checkbox" checked={permissions.hasPublish} onChange={(e) => setPermissions({...permissions, hasPublish: e.target.checked})} />
+                </label>
+                <label className="flex items-center justify-between p-3 border rounded-lg">
+                  <span>开通ROI权限</span>
+                  <input type="checkbox" checked={permissions.hasRoi} onChange={(e) => setPermissions({...permissions, hasRoi: e.target.checked})} />
+                </label>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button onClick={() => setShowPermissionsModal(false)} className="flex-1 py-2 bg-gray-100 rounded-lg">取消</button>
+                <button onClick={async () => {
+                   try {
+                     await fetch(`/api/users/${selectedUser._id}/permissions`, {
+                       method: 'PUT',
+                       headers: { 'Content-Type': 'application/json' },
+                       body: JSON.stringify(permissions)
+                     });
+                     setShowPermissionsModal(false);
+                     await fetchData();
+                     alert('权限已保存');
+                   } catch(e) {
+                     alert('保存失败');
+                   }
+                }} className="flex-1 py-2 bg-blue-500 text-white rounded-lg">保存</button>
               </div>
             </div>
           </div>

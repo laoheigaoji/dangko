@@ -24,6 +24,12 @@ export default function PublishTurnover() {
 
     const userInfo = JSON.parse(userStr);
     
+    if (!userInfo.isVip) {
+      alert("请先联系管理员开通权限");
+      navigate("/");
+      return;
+    }
+
     // Validate
     for (const item of items) {
       if (!item.shopName.trim() || !item.transferAmount || !item.transferPrice) {
